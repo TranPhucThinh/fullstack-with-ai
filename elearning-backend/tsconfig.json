@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", // nhắm tới chuẩn ES2022 — đủ mới cho mọi tính năng hiện đại
+    "module": "NodeNext", // hệ thống module theo Node hiện đại
+    "moduleResolution": "NodeNext", // cách TS tìm file khi import
+    "strict": true, // bật chế độ nghiêm ngặt — bắt lỗi sớm, chuẩn senior
+    "esModuleInterop": true, // import CJS từ ESM mượt mà
+    "skipLibCheck": true, // bỏ kiểm tra file .d.ts của thư viện (nhanh hơn)
+    "rootDir": "./src", // gốc code nguồn — giữ cấu trúc thư mục trong dist/ cho ra đúng chỗ
+    "outDir": "dist", // nơi chứa code biên dịch (dùng sau này ở production)
+    "types": ["node"]
+  },
+  "include": ["src"] // chỉ kiểm tra code trong thư mục src
+}

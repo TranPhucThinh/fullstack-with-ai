@@ -1,0 +1,16 @@
+# Khai báo container PostgreSQL cho dự án e-learning
+services:
+  postgres:
+    image: postgres:16-alpine              # bản PostgreSQL 16, nhẹ (alpine)
+    container_name: elearning-postgres      # tên container để dễ nhận diện
+    environment:                           # biến môi trường cho PostgreSQL khởi tạo
+      POSTGRES_USER: elearning              # tài khoản admin của database
+      POSTGRES_PASSWORD: elearning_dev_password # mật khẩu — chỉ cho dev, bài sau học cách giấu
+      POSTGRES_DB: elearning                # tên database mặc định
+    ports:
+      - "5432:5432"          # mở cổng 5432 của máy ra container 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data    # lưu data vào ổ "pgdata" — không mất khi tắt container
+
+volumes:
+  pgdata:                                   # khai báo ổ lưu trữ bền vững
