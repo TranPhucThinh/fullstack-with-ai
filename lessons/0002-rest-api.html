@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 02 · REST API — resource, URL design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 0 · Bài 02</span>
+  <h1>REST API — resource, URL design</h1>
+  <p class="subtitle">Biến HTTP thành một ngôn ngữ thiết kế API có quy tắc — và dự án của bạn có endpoint thật đầu tiên trả JSON.</p>
+  <p class="meta-line">⏱ ~45 phút · 🎯 Mục tiêu: server của bạn trả danh sách khóa học dạng JSON qua <code>GET /api/courses</code> — mẩu chạy được đầu tiên có routing thật.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 01 bạn biết HTTP có method (GET/POST/PUT/DELETE) và status code (200/404...). Nhưng mới chỉ có một đường dẫn <code>/</code>. Một hệ thống e-learning có hàng chục "thứ" cần quản lý: khóa học, người dùng, bài giảng... <strong>REST</strong> là bộ quy tắc trả lời câu hỏi: làm sao thiết kế đường dẫn và method cho <strong>có ý nghĩa, nhất quán, dễ đoán</strong>.</p>
+  </div>
+
+  <h2>1. REST là gì — "tài nguyên" là trung tâm</h2>
+  <p><strong>REST (Representational State Transfer)</strong> là một phong cách kiến trúc API. Ý tưởng cốt lõi: mọi thứ hệ thống quản lý — khóa học, người dùng, đơn hàng — là một <strong>resource (tài nguyên)</strong>. Mỗi resource có một <strong>định danh</strong> (URL) và được thao tác bằng <strong>HTTP method chuẩn</strong>.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao gọi là "Representational"?</div>
+    <p>Server không gửi "khóa học" vật lý — nó gửi một <strong>biểu diễn (representation)</strong> của khóa học, thường là JSON. Client nhận JSON, hiển thị, sửa, gửi lại. Đó là lý do API trả JSON chứ không trả "đối tượng" — bạn đang trao đổi biểu diễn của tài nguyên.</p>
+  </div>
+
+  <p>Theo <a href="https://developer.mozilla.org/en-US/docs/Glossary/REST" target="_blank">MDN — REST</a>, REST là một kiến trúc phần mềm cho phép client và server giao tiếp qua HTTP, dựa trên tài nguyên và các method chuẩn.</p>
+
+  <h2>2. URL design — danh từ số nhiều, không động từ</h2>
+  <p>Quy tắc vàng của REST: URL chỉ <strong>tài nguyên</strong> (danh từ), còn <strong>hành động</strong> nằm ở method. So sánh:</p>
+  <table class="data">
+    <thead><tr><th>❌ Sai (hành động trong URL)</th><th>✅ Đúng (tài nguyên + method)</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /getCourses</code></td><td><code>GET /api/courses</code></td><td>Lấy danh sách khóa học</td></tr>
+      <tr><td><code>POST /createCourse</code></td><td><code>POST /api/courses</code></td><td>Tạo khóa học mới</td></tr>
+      <tr><td><code>GET /deleteCourse?id=5</code></td><td><code>DELETE /api/courses/5</code></td><td>Xóa khóa học id=5</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao "danh từ số nhiều"?</div>
+    <p><code>/api/courses</code> là <strong>bộ sưu tập</strong> (collection) — GET lấy cả bộ, POST thêm phần tử. <code>/api/courses/5</code> là <strong>một phần tử</strong> (item) — GET lấy nó, DELETE xóa nó. Quy ước này làm API <strong>dễ đoán</strong>: thấy URL là đoán được method nào hợp lệ, không cần đọc tài liệu.</p>
+  </div>
+
+  <h2>3. Method mapping — hành động lên resource</h2>
+  <p>Với mỗi resource, 4 method chuẩn tạo thành vòng đời CRUD:</p>
+  <table class="data">
+    <thead><tr><th>Method</th><th>URL</th><th>Hành động</th><th>Status code thành công</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET</code></td><td><code>/api/courses</code></td><td>Lấy danh sách</td><td><code>200 OK</code></td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/courses/5</code></td><td>Lấy 1 khóa học</td><td><code>200 OK</code> / <code>404</code> nếu không có</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/courses</code></td><td>Tạo mới</td><td><code>201 Created</code></td></tr>
+      <tr><td><code>PUT</code></td><td><code>/api/courses/5</code></td><td>Thay thế toàn bộ</td><td><code>200 OK</code></td></tr>
+      <tr><td><code>DELETE</code></td><td><code>/api/courses/5</code></td><td>Xóa</td><td><code>204 No Content</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao POST trả 201, DELETE trả 204?</div>
+    <p>Status code không chỉ "thành công hay không" — nó <strong>kể chi tiết</strong>. <code>201 Created</code> báo "đã tạo, đây là thứ mới". <code>204 No Content</code> báo "đã xóa, không còn gì để trả". Client dựa vào đó để xử lý đúng — đây là chi tiết phân biệt junior và senior khi thiết kế API.</p>
+  </div>
+
+  <h2>4. Thực hành — server REST đầu tiên của dự án</h2>
+  <p>Giờ thay <code>src/server.ts</code> bằng server REST: trả danh sách khóa học JSON qua <code>GET /api/courses</code>, chi tiết qua <code>GET /api/courses/:id</code>, và 404 cho mọi thứ khác. Mở file <code>src/server.ts</code> trong editor và thay toàn bộ nội dung:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts</span>
+<pre><code><span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+
+<span class="cmt">// Dữ liệu khóa học tạm — chưa có database, bài 12 sẽ thay bằng PostgreSQL</span>
+<span class="kw">const</span> courses = [
+  { id: <span class="num">1</span>, title: <span class="str">'NestJS cơ bản'</span>, price: <span class="num">500000</span> },
+  { id: <span class="num">2</span>, title: <span class="str">'Design Pattern cho Backend'</span>, price: <span class="num">800000</span> },
+]
+
+<span class="cmt">// Tạo server: mỗi request tới, hàm này nhận (req, res)</span>
+<span class="kw">const</span> server = <span class="fn">createServer</span>((req, res) => {
+  <span class="cmt">// Phân tích URL: path (đường dẫn) và query (tham số ?...)</span>
+  <span class="kw">const</span> url = <span class="kw">new</span> <span class="fn">URL</span>(req.url ?? <span class="str">'/'</span>, `http://${req.headers.host}`)
+  <span class="kw">const</span> path = url.pathname
+
+  <span class="cmt">// Routing: so khớp path với từng tài nguyên</span>
+  <span class="kw">if</span> (req.method === <span class="str">'GET'</span> && path === <span class="str">'/api/courses'</span>) {
+    <span class="cmt">// Trả danh sách khóa học dạng JSON</span>
+    res.<span class="fn">writeHead</span>(<span class="num">200</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json; charset=utf-8'</span> })
+    res.<span class="fn">end</span>(<span class="fn">JSON.stringify</span>(courses))
+    <span class="kw">return</span>
+  }
+
+  <span class="cmt">// Pattern /api/courses/:id — lấy id từ path bằng regex</span>
+  <span class="kw">const</span> match = path.<span class="fn">match</span>(<span class="str">/^\/api\/courses\/(\d+)$/</span>)
+  <span class="kw">if</span> (req.method === <span class="str">'GET'</span> && match) {
+    <span class="kw">const</span> id = <span class="fn">Number</span>(match[<span class="num">1</span>])
+    <span class="kw">const</span> course = courses.<span class="fn">find</span>((c) => c.id === id)
+    <span class="kw">if</span> (course) {
+      res.<span class="fn">writeHead</span>(<span class="num">200</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json; charset=utf-8'</span> })
+      res.<span class="fn">end</span>(<span class="fn">JSON.stringify</span>(course))
+    } <span class="kw">else</span> {
+      <span class="cmt">// Không tìm thấy → 404 Not Found</span>
+      res.<span class="fn">writeHead</span>(<span class="num">404</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json; charset=utf-8'</span> })
+      res.<span class="fn">end</span>(<span class="fn">JSON.stringify</span>({ error: <span class="str">'Course not found'</span> }))
+    }
+    <span class="kw">return</span>
+  }
+
+  <span class="cmt">// Mọi request khác → 404</span>
+  res.<span class="fn">writeHead</span>(<span class="num">404</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json; charset=utf-8'</span> })
+  res.<span class="fn">end</span>(<span class="fn">JSON.stringify</span>({ error: <span class="str">'Route not found'</span> }))
+})
+
+<span class="kw">const</span> PORT = <span class="num">4000</span>
+<span class="kw">const</span> HOST = <span class="str">'0.0.0.0'</span>
+
+server.<span class="fn">listen</span>(PORT, HOST, () => {
+  console.<span class="fn">log</span>(`✅ Server chạy tại http://localhost:${PORT}`)
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng regex để bắt id?</div>
+    <p>Node thuần chưa có "route pattern" như Express. Regex <code>/^\/api\/courses\/(\d+)$/</code> khớp đúng dạng <code>/api/courses/5</code> và <strong>bắt số id</strong> vào nhóm <code>match[1]</code>. Bài 07 sẽ đào sâu routing thủ công; bài 10 (Express) cho bạn thấy framework làm việc này gọn hơn thế nào.</p>
+  </div>
+
+  <h2>5. Chạy và kiểm tra — sanity check</h2>
+  <p>Server đang chạy ở terminal 1 với <code>npm run dev</code> sẽ <strong>tự reload</strong> khi bạn lưu file (tsx watch). Mở terminal thứ hai và kiểm tra:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — terminal thứ hai</span>
+<pre><code><span class="cmt"># Lấy danh sách khóa học — phải trả JSON 2 khóa học, HTTP 200</span>
+curl -s -w <span class="str">"\nHTTP:%{http_code}"</span> http://localhost:4000/api/courses</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">output mong đợi</span>
+<pre><code>[{"id":1,"title":"NestJS cơ bản","price":500000},{"id":2,"title":"Design Pattern cho Backend","price":800000}]
+HTTP:200</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">bash — chi tiết + 404</span>
+<pre><code><span class="cmt"># Lấy khóa học id=2 — phải trả JSON đúng khóa học, HTTP 200</span>
+curl -s -w <span class="str">"\nHTTP:%{http_code}"</span> http://localhost:4000/api/courses/2
+
+<span class="cmt"># Khóa học không tồn tại — phải trả {"error":"Course not found"}, HTTP 404</span>
+curl -s -w <span class="str">"\nHTTP:%{http_code}"</span> http://localhost:4000/api/courses/99
+
+<span class="cmt"># Đường dẫn không tồn tại — phải trả {"error":"Route not found"}, HTTP 404</span>
+curl -s -w <span class="str">"\nHTTP:%{http_code}"</span> http://localhost:4000/api/unknown</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng trên máy thật</div>
+    <p>Code mẫu trên đã chạy XANH trong sandbox sạch dùng đúng <code>package.json</code> + <code>package-lock.json</code> của dự án bạn: <strong>tsc exit 0</strong>, 4 trường hợp curl trả đúng JSON + đúng status code (200/200/404/404). Bạn làm theo đúng thứ tự sẽ ra kết quả y hệt.</p>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Bạn muốn API "xóa khóa học id=7". URL và method nào đúng chuẩn REST?</div>
+    <button class="opt" data-correct="false" data-explain="GET chỉ để lấy dữ liệu — dùng GET để xóa là sai ý nghĩa method.">A. GET /api/deleteCourse?id=7</button>
+    <button class="opt" data-correct="true" data-explain="DELETE + /api/courses/7 — tài nguyên là danh từ, hành động xóa nằm ở method. Đúng chuẩn REST.">B. DELETE /api/courses/7</button>
+    <button class="opt" data-correct="false" data-explain="POST dùng để tạo tài nguyên mới, không phải xóa.">C. POST /api/courses/7/delete</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. API tạo khóa học mới thành công. Status code nào đúng nhất?</div>
+    <button class="opt" data-correct="false" data-explain="200 OK đúng nhưng chung chung — không báo rõ 'đã tạo tài nguyên mới'.">A. 200 OK</button>
+    <button class="opt" data-correct="true" data-explain="201 Created là mã chuyên cho 'tạo tài nguyên mới thành công' — chi tiết hơn 200, đúng chuẩn REST.">B. 201 Created</button>
+    <button class="opt" data-correct="false" data-explain="204 No Content dùng cho xóa thành công — không phù hợp khi tạo mới.">C. 204 No Content</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. URL nào sau đây vi phạm quy tắc "URL chỉ tài nguyên, hành động nằm ở method"?</div>
+    <button class="opt" data-correct="false" data-explain="GET /api/courses là tài nguyên thuần — đúng chuẩn.">A. GET /api/courses</button>
+    <button class="opt" data-correct="true" data-explain="getCourses là động từ trong URL — hành động phải nằm ở method GET, URL chỉ nên là /api/courses.">B. GET /api/getCourses</button>
+    <button class="opt" data-correct="false" data-explain="DELETE /api/courses/5 — tài nguyên + method, đúng chuẩn.">C. DELETE /api/courses/5</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu REST: tài nguyên là trung tâm, URL là danh từ, hành động nằm ở method</li>
+      <li>Biết mapping CRUD → method + status code (200/201/204/404)</li>
+      <li>Dự án có endpoint thật đầu tiên: <code>GET /api/courses</code> trả JSON</li>
+      <li>Biết dùng regex bắt id từ path trong Node thuần</li>
+    </ul>
+  </div>
+
+  <h2>6. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Server của bạn giờ trả JSON — nhưng bạn <strong>nhìn thấy</strong> nó bằng mắt thường qua curl. Làm sao để "nhìn" JSON đẹp hơn, gửi request POST/PUT có body, và lưu lại bộ sưu tập request để test lại sau? Đó là <strong>JSON & API client (curl/Postman)</strong> — bài tiếp theo.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 03 · JSON & API client (curl/Postman)</div>
+    <p class="nd">Làm bạn với JSON — định dạng trao đổi dữ liệu của mọi API — và công cụ để gọi API như một người chuyên nghiệp.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0001-http-la-gi.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy 4 lệnh curl ở mục 5 và gửi tôi output — tôi sẽ xác nhận bạn đọc đúng JSON + status code. Có gì chưa rõ về REST/resource/URL design, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
