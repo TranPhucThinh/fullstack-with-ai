@@ -17,3 +17,11 @@
 - Tạo thư mục dự án `elearning-backend/` tại workspace gốc
 - Mỗi bài đóng góp mẩu CHẠY ĐƯỢC vào dự án
 - Chấm bài = đọc file thật + chạy test thật
+
+## Git workflow (người học yêu cầu 08/06/2026)
+- Repo: https://github.com/TranPhucThinh/fullstack-with-ai.git (branch `main`)
+- **Push TRƯỚC mỗi bài mới**: commit + push bài học cũ (kể cả code bài tập người học viết) trước khi soạn bài tiếp theo
+- Đã push: commit `58cfb6b` phase khởi tạo (MISSION, lộ trình, Bài 00)
+- `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
+- Git user: `thinh.18` / `thinh.tp@devtify.com`
+- Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
