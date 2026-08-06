@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lộ trình Senior Backend Node.js/NestJS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+<style>
+  .hero { text-align: center; margin-bottom: 14px; }
+  .hero h1 { font-size: 2.4rem; }
+  .progress-wrap { margin: 26px 0 40px; }
+  .progress-bar { height: 10px; background: var(--bg-card); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; }
+  .progress-label { text-align: center; color: var(--text-dim); font-size: 14px; margin-top: 8px; }
+  .module { margin: 30px 0; }
+  .module-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .module-num { font-family: var(--mono); color: var(--accent); font-weight: 600; font-size: 14px; }
+  .module-head h2 { border: none; margin: 14px 0 2px; padding: 0; font-size: 1.35rem; }
+  .module-why { color: var(--text-dim); font-size: 14px; margin: 0 0 12px; }
+  .lessons-list { list-style: none; padding: 0; margin: 0; }
+  .lessons-list li { margin: 6px 0; }
+  .lessons-list a, .lessons-list span.soon {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg-soft); font-size: 15px;
+  }
+  .lessons-list a { color: var(--text); }
+  .lessons-list a:hover { border-color: var(--accent); background: var(--bg-card); }
+  .lessons-list span.soon { color: var(--text-dim); border-style: dashed; }
+  .badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; flex-shrink: 0; }
+  .badge.done { background: rgba(74,222,128,.15); color: var(--green); }
+  .badge.now  { background: rgba(56,189,248,.15); color: var(--accent); }
+  .badge.soon { background: #232838; color: var(--text-dim); }
+  .lcount { margin-left: auto; font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+  .intro-card { background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid var(--accent-2); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <span class="lesson-tag">🏗️ Node.js · NestJS · Senior path</span>
+    <h1>Lộ trình Senior Backend — Node.js / NestJS</h1>
+    <p class="subtitle">Học từ gốc lên: HTTP → Node thuần → Express → TypeScript → NestJS → Production-grade → Kiến trúc senior. Mỗi bài đóng góp một mẩu chạy được vào dự án e-learning.</p>
+  </div>
+
+  <div class="intro-card">
+    <strong>Cách học:</strong> Bạn coi như chưa biết gì về backend — mỗi bài dạy MỘT thứ, nhỏ, làm xong nhanh, có win cụ thể.
+    Dự án song song <strong>E-Learning Platform</strong> lớn dần theo từng bài. Chấm bài = đọc code thật + chạy test thật.
+    Hỏi tôi (người dạy) bất cứ điều gì chưa rõ — ở cuối mỗi bài.
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" style="width: 1.5%"></div></div>
+    <div class="progress-label">0 / ~66 bài · mới bắt đầu — Bài 00 sẵn sàng</div>
+  </div>
+
+  <!-- ===== MODULE 0 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 0</span></div>
+    <h2>Nền tảng HTTP & Web</h2>
+    <p class="module-why">Backend là gì, HTTP là gì — nền móng để mọi thứ sau này có nghĩa. Không hiểu HTTP thì không hiểu bất kỳ framework nào.</p>
+    <ul class="lessons-list">
+      <li><a href="0000-moi-truong-du-an.html"><span class="badge now">Bài 00</span> Dựng môi trường + khung dự án e-learning chạy được <span class="lcount">sẵn sàng</span></a></li>
+      <li><span class="soon"><span class="badge soon">Bài 01</span> HTTP là gì — request/response, method, status code, header <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 02</span> REST API — resource, URL design <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 03</span> JSON & API client (curl/Postman) <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 1 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 1</span></div>
+    <h2>Node.js từ gốc</h2>
+    <p class="module-why">Hiểu Node là gì, event loop, non-blocking I/O — viết web server bằng Node thuần KHÔNG framework, để thấy Express/NestJS giải quyết bài toán gì.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 04</span> Node.js là gì — event loop, non-blocking I/O <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 05</span> Module system (CJS/ESM), npm, package.json <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 06</span> HTTP server bằng Node thuần (http module) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 07</span> Xử lý request/response thủ công — routing, body, query <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 08</span> File system, streams, process, env <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 09</span> Vì sao cần framework? Bài toán Express giải quyết <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 2 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 2</span></div>
+    <h2>Express từ nền tảng</h2>
+    <p class="module-why">Framework đầu tiên — hiểu middleware, routing, kết nối database thật, rồi xây auth cơ bản. Nền này làm NestJS sau này dễ thở.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 10</span> Express cơ bản — routing, middleware <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 11</span> Middleware nâng cao — error, logging, CORS <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 12</span> Kết nối PostgreSQL (pg) — SQL thật, CRUD users <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 13</span> Thiết kế database e-learning — ERD, bảng users/courses <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 14</span> Auth cơ bản bằng Express — bcrypt, JWT <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 15</span> Tổng kết Express — e-learning chạy bằng Express thuần <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 3 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 3</span></div>
+    <h2>TypeScript</h2>
+    <p class="module-why">NestJS xây trên TypeScript — đặc biệt decorators là nền tảng DI của NestJS. Hiểu TS là hiểu vì sao NestJS viết theo kiểu đó.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 16</span> TypeScript cơ bản — type, interface, generics <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 17</span> TS nâng cao — decorators (nền tảng NestJS!), utility types <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 18</span> Chạy TS với Node — tsx, tsconfig <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 19</span> Vì sao NestJS chọn TS + DI? Cầu nối sang NestJS <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 4 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 4</span></div>
+    <h2>NestJS nền tảng</h2>
+    <p class="module-why">Chuyển từ Express sang NestJS — DI Container, Module system, Controller/Service/Provider, TypeORM. Đây là nơi tư duy architecture bắt đầu.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 20</span> NestJS là gì — DI Container, Module system <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 21</span> Controller, Service, Provider — vòng đời request <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 22</span> DTO, ValidationPipe, class-validator <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 23</span> TypeORM + PostgreSQL trong NestJS — entities, migrations <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 24</span> Chuyển dự án Express → NestJS (bài tổng hợp lớn) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 25</span> Mini-recall toàn module <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 5 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 5</span></div>
+    <h2>Authentication & Authorization</h2>
+    <p class="module-why">Đăng ký/đăng nhập/đăng xuất/quên-đổi mật khẩu, phân quyền admin/teacher/student — xương sống của mọi hệ thống. Bảo mật theo chuẩn OWASP.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 26</span> Đăng ký người dùng — bcrypt, hash password <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 27</span> Đăng nhập — JWT access token <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 28</span> Refresh token & đăng xuất <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 29</span> Quên mật khẩu — email + token có hạn <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 30</span> Đổi mật khẩu <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 31</span> RBAC — roles, guards, permissions <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 32</span> Phân quyền admin/teacher/student thực chiến <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 33</span> Bảo mật auth theo chuẩn OWASP <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 6 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 6</span></div>
+    <h2>Nghiệp vụ cốt lõi E-Learning</h2>
+    <p class="module-why">Khóa học, bài giảng, enrollment, progress — nghiệp vụ của chính dự án. Học cách đưa logic vào đúng chỗ (service, không nhét controller).</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 34</span> Khóa học — CRUD, relations <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 35</span> Bài giảng (lectures) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 36</span> Enrollment & quyền truy cập nội dung <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 37</span> Kiểm tra quyền — vì sao không nhét logic vào controller <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 38</span> Progress học tập — đánh dấu hoàn thành <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 39</span> Mini-recall toàn module <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 7 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 7</span></div>
+    <h2>Thương mại điện tử</h2>
+    <p class="module-why">Giỏ hàng, checkout, thanh toán, webhook, idempotency — phần khó nhất của dự án. Race condition, transaction ACID, tiền bạc không được sai.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 40</span> Giỏ hàng — design đúng <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 41</span> Giỏ hàng — tránh race condition <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 42</span> Giỏ hàng — API hoàn chỉnh <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 43</span> Checkout — transaction ACID trong PostgreSQL <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 44</span> Order — quản lý đơn hàng <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 45</span> Thanh toán Stripe sandbox — PaymentIntent <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 46</span> Webhook thanh toán & idempotency <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 47</span> Hoàn tiền/refund — đơn hàng bất thường <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 8 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 8</span></div>
+    <h2>Production-grade</h2>
+    <p class="module-why">Logging, testing, CI/CD, deployment — thứ biến code chạy được thành hệ thống đáng tin cậy. Senior không giao sản phẩm không test.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 48</span> Logging — cấu trúc log, request ID <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 49</span> Logging nâng cao — log theo ngữ cảnh <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 50</span> Unit test với Jest <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 51</span> E2E test với Supertest <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 52</span> Test database — test không phá data thật <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 53</span> Docker hóa production <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 54</span> CI pipeline — GitHub Actions <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 55</span> Deployment & monitoring cơ bản <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 9 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 9</span></div>
+    <h2>Kiến trúc senior</h2>
+    <p class="module-why">Caching, rate limiting, CQRS, event-driven, queue, performance — tầng tư duy quyết định senior khác junior ở chỗ nào.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 56</span> Caching với Redis — tầng cache đúng chỗ <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 57</span> Cache invalidation — nỗi đau số 1 <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 58</span> Rate limiting & OWASP API Top 10 thực hành <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 59</span> CQRS trong NestJS <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 60</span> Event-driven & queue (BullMQ) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 61</span> Performance tunning — N+1, index, phân tích query <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== MODULE 10 ===== -->
+  <div class="module">
+    <div class="module-head"><span class="module-num">Module 10</span></div>
+    <h2>Đỉnh cao senior</h2>
+    <p class="module-why">Mock phỏng vấn, review code 5 trục, portfolio — gói lại toàn bộ hành trình thành năng lực chứng minh được cho công ty.</p>
+    <ul class="lessons-list">
+      <li><span class="soon"><span class="badge soon">Bài 62</span> Mock phỏng vấn senior — vòng 1 (kiến thức) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 63</span> Mock phỏng vấn — vòng 2 (thiết kế hệ thống) <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 64</span> Review code 5 trục — dự án của chính bạn <span class="lcount">sắp tới</span></span></li>
+      <li><span class="soon"><span class="badge soon">Bài 65</span> Tổng kết, portfolio, lộ trình tiếp theo <span class="lcount">sắp tới</span></span></li>
+    </ul>
+  </div>
+
+  <p class="try-it" style="text-align:center; margin-top:40px;">
+    📌 Lộ trình <strong>co giãn</strong>: nắm nhanh thì gộp bài, vấp thì tách thêm bài luyện.<br>
+    Muốn thêm/bớt/đổi thứ tự — cứ nói với tôi (người dạy) bất cứ lúc nào.
+  </p>
+</div>
+</body>
+</html>

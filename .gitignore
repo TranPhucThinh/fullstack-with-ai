@@ -1,0 +1,18 @@
+# Dependencies — cài lại được bằng "npm install"
+node_modules/
+
+# Build artifact
+dist/
+build/
+
+# Bí mật môi trường
+.env
+.env.*
+
+# Cấu hình máy cá nhân / tool — không commit
+.agents/
+.settings/
+*.local.json
+
+# Hệ điều hành
+.DS_Store

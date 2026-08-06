@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 00 · Dựng môi trường + khung dự án e-learning chạy được</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 0 · Bài 00</span>
+  <h1>Dựng môi trường + khung dự án e-learning chạy được</h1>
+  <p class="subtitle">Máy của bạn có sẵn mọi công cụ — bài này biến chúng thành một dự án backend chạy thật và một database PostgreSQL.</p>
+  <p class="meta-line">⏱ ~30 phút · 🎯 Mục tiêu: server Node của bạn trả lời HTTP 200 + PostgreSQL chạy trong Docker, cả hai bật bằng 2 lệnh.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bạn đã cài Node, Docker, git trên máy (tôi đã kiểm tra trực tiếp). Bài này không dạy gì mới về lập trình — chỉ dàn cảnh sân khấu: đặt mọi thứ vào đúng chỗ, bật công tắc, nhìn đèn sáng. Từ bài sau trở đi mọi kiến thức sẽ <strong>bám vào dự án này</strong>, lớn dần thành e-learning hoàn chỉnh.</p>
+  </div>
+
+  <h2>1. Tạo thư mục dự án</h2>
+  <p>Toàn bộ hành trình của bạn nằm trong thư mục <code>elearning-backend/</code> — dự án chính mà mỗi bài sau sẽ thêm vào. Chạy lệnh sau trong terminal (thư mục hiện tại đã là <code>learn_fullstack</code>):</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code><span class="cmt"># Tạo thư mục dự án và đi vào trong</span>
+mkdir <span class="str">elearning-backend</span> && cd <span class="str">elearning-backend</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao có "sân tập" riêng?</div>
+    <p>Khi bạn quay lại sau 2 tuần, thư mục này chứa <strong>toàn bộ lịch sử dự án</strong> — mỗi bài là một mốc bạn nhìn thấy sản phẩm lớn dần. Không phải học xong mới làm: bài đầu tiên đã có thứ chạy được.</p>
+  </div>
+
+  <h2>2. Khởi tạo dự án Node.js</h2>
+  <p><code>npm init -y</code> tạo file <code>package.json</code> — "giấy khai sinh" của dự án Node: tên, phiên bản, và đặc biệt là <strong>danh sách dependencies</strong> (các thư viện cần cài). Sau này mỗi package bạn cài đều ghi vào đây.</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code><span class="cmt"># Khởi tạo dự án với cấu hình mặc định (không hỏi gì thêm)</span>
+npm init -y</code></pre>
+  </div>
+
+  <h2>3. Cài trình chạy TypeScript (tsx)</h2>
+  <p>Từ Module 3 bạn sẽ học TypeScript (TS) sâu. Ngay từ bây giờ, dự án dùng TS — <code>tsx</code> là trình chạy TS trực tiếp trên Node, <strong>không cần bước biên dịch riêng</strong>, kèm chế độ <code>watch</code> tự reload khi sửa file. Đây là công cụ phổ biến và ổn định cho dev hiện đại.</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code><span class="cmt"># Cài tsx làm dependency chính (chạy được cả lúc dev lẫn production)</span>
+npm install tsx</code></pre>
+  </div>
+
+  <p>Theo <a href="https://tsx.is/" target="_blank">tài liệu chính thức của tsx</a>, tsx hỗ trợ chạy TypeScript và ESM trực tiếp, không cần cấu hình. Đã kiểm chứng với <strong>tsx 4.23.9 trên Node v20.19.3</strong>.</p>
+
+  <h2>4. Cấu hình package.json — script chạy</h2>
+  <p>Scripts trong <code>package.json</code> là "rút gọn lệnh": bạn gõ <code>npm run dev</code> thay vì cả chuỗi dài. Mở file <code>package.json</code> bằng editor và thay toàn bộ nội dung:</p>
+
+  <div class="code-block">
+    <span class="code-label">package.json</span>
+<pre><code>{
+  <span class="str">"name"</span>: <span class="str">"elearning-backend"</span>,
+  <span class="str">"version"</span>: <span class="str">"1.0.0"</span>,
+  <span class="str">"type"</span>: <span class="str">"module"</span>,          <span class="cmt">// dùng ESM (import/export) thay vì CommonJS (require)</span>
+  <span class="str">"scripts"</span>: {
+    <span class="str">"dev"</span>: <span class="str">"tsx watch src/server.ts"</span>,  <span class="cmt">// chạy dev: tự reload khi sửa file</span>
+    <span class="str">"start"</span>: <span class="str">"tsx src/server.ts"</span>       <span class="cmt">// chạy production-style: không watch</span>
+  },
+  <span class="str">"dependencies"</span>: {
+    <span class="str">"tsx"</span>: <span class="str">"^4.23.9"</span>
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao "type": "module"?</div>
+    <p>Node có 2 hệ thống module: CommonJS (<code>require</code>) và ESM (<code>import</code>). ESM là chuẩn hiện đại, được NestJS/TypeScript dùng. Khai báo <code>"type": "module"</code> giúp Node hiểu file <code>.ts</code> của bạn dùng cú pháp <code>import</code>. Bài 05 sẽ đào sâu vì sao.</p>
+  </div>
+
+  <h2>5. Cài type definitions cho Node + tạo tsconfig</h2>
+  <p>TypeScript cần biết "hình dạng" của thư viện gốc Node (như <code>http</code>, <code>fs</code>) để gợi ý đúng và báo lỗi sớm. Gói <code>@types/node</code> cung cấp đúng thứ đó — đây là loại lỗi mà chỉ verify trong thư mục sạch mới phát hiện ra:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code><span class="cmt"># Cài type definitions cho Node — chỉ cần khi dev, không cần lúc chạy</span>
+npm install -D @types/node</code></pre>
+  </div>
+
+  <p>Sau đó tạo file <code>tsconfig.json</code> — cấu hình cách TypeScript kiểm tra code của bạn:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — tạo file cấu hình TS</span>
+<pre><code>cat > tsconfig.json << 'EOF'
+{
+  <span class="str">"compilerOptions"</span>: {
+    <span class="str">"target"</span>: <span class="str">"ES2022"</span>,          <span class="cmt">// nhắm tới chuẩn ES2022 — đủ mới cho mọi tính năng hiện đại</span>
+    <span class="str">"module"</span>: <span class="str">"NodeNext"</span>,       <span class="cmt">// hệ thống module theo Node hiện đại</span>
+    <span class="str">"moduleResolution"</span>: <span class="str">"NodeNext"</span>, <span class="cmt">// cách TS tìm file khi import</span>
+    <span class="str">"strict"</span>: <span class="str">true</span>,              <span class="cmt">// bật chế độ nghiêm ngặt — bắt lỗi sớm, chuẩn senior</span>
+    <span class="str">"esModuleInterop"</span>: <span class="str">true</span>,    <span class="cmt">// import CJS từ ESM mượt mà</span>
+    <span class="str">"skipLibCheck"</span>: <span class="str">true</span>,        <span class="cmt">// bỏ kiểm tra file .d.ts của thư viện (nhanh hơn)</span>
+    <span class="str">"outDir"</span>: <span class="str">"dist"</span>            <span class="cmt">// nơi chứa code biên dịch (dùng sau này ở production)</span>
+  },
+  <span class="str">"include"</span>: [<span class="str">"src"</span>]           <span class="cmt">// chỉ kiểm tra code trong thư mục src</span>
+}
+EOF</code></pre>
+  </div>
+
+  <h2>6. Viết server đầu tiên — Node thuần (chưa cần framework)</h2>
+  <p>Tạo thư mục <code>src</code> và file <code>server.ts</code>. Đây là <strong>server HTTP thuần Node</strong> — không Express, không NestJS — để bạn thấy tận mắt nền tảng bên dưới mọi framework:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — tạo thư mục source</span>
+<pre><code>mkdir src</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts</span>
+<pre><code><span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>; <span class="cmt">// lấy hàm tạo web server từ module http của Node</span>
+
+<span class="cmt">// Tạo server: mỗi khi có request tới, hàm này được gọi</span>
+<span class="kw">const</span> server = <span class="fn">createServer</span>((req, res) => {
+  res.<span class="fn">writeHead</span>(<span class="num">200</span>, { <span class="str">'Content-Type'</span>: <span class="str">'text/plain; charset=utf-8'</span> });
+  res.<span class="fn">end</span>(<span class="str">'E-Learning API đang chạy! 🚀'</span>);
+});
+
+<span class="kw">const</span> PORT = <span class="num">4000</span>;      <span class="cmt">// cổng mặc định — đổi được khi cần</span>
+<span class="kw">const</span> HOST = <span class="str">'0.0.0.0'</span>; <span class="cmt">// lắng nghe mọi kết nối, không chỉ localhost</span>
+
+<span class="cmt">// Bật server, in ra URL để mở trình duyệt</span>
+server.<span class="fn">listen</span>(PORT, HOST, () => {
+  console.<span class="fn">log</span>(`✅ Server chạy tại http://localhost:${PORT}`);
+});</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao bắt đầu bằng Node thuần?</div>
+    <p>Express và NestJS đều <strong>được xây trên chính <code>node:http</code></strong> này. Khi bạn hiểu request/response/vòng đời ở tầng gốc, mọi khái niệm framework sau này ("middleware", "controller", "pipe") chỉ là lớp bọc quanh đúng thứ bạn đang thấy. Bài 04–08 sẽ đào sâu toàn bộ.</p>
+  </div>
+
+  <h2>7. Chạy server — sanity check đầu tiên</h2>
+  <p>Giờ bật máy. Lệnh này khởi động server và <strong>không tắt terminal</strong> (chạy nền):</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code>npm run dev</code></pre>
+  </div>
+
+  <p>Bạn sẽ thấy <code>✅ Server chạy tại http://localhost:4000</code>. Mở trình duyệt tới <code>http://localhost:4000</code> — bạn thấy dòng chữ "E-Learning API đang chạy! 🚀". Hoặc kiểm tra bằng lệnh (mở terminal mới):</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — terminal thứ hai</span>
+<pre><code><span class="cmt"># Gửi request HTTP tới server. -s: im lặng, -o /dev/null: bỏ nội dung, -w: in status code</span>
+curl -s -o /dev/null -w <span class="str">"%{http_code}"</span> http://localhost:4000</code></pre>
+  </div>
+
+  <p>Kết quả phải là <code>200</code> — mã chuẩn nghĩa là "thành công". Đây là sanity check tối thiểu chứng minh cả bộ máy chạy.</p>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng trên máy thật</div>
+    <p>Các bước 1–7 đã chạy XANH trong sandbox sạch: <strong>Node v20.19.3 + tsx 4.23.9</strong>, server trả <code>HTTP 200</code> đúng nội dung. Bạn làm theo đúng thứ tự sẽ ra kết quả y hệt.</p>
+  </div>
+
+  <h2>8. PostgreSQL qua Docker — database của dự án</h2>
+  <p>Backend cần lưu dữ liệu. Chuẩn production cho database là chạy PostgreSQL. Thay vì cài native (máy bạn chưa có), ta chạy PostgreSQL trong <strong>Docker container</strong> — một "chiếc máy ảo siêu nhẹ" chứa đúng PostgreSQL, cô lập khỏi hệ điều hành. Cách này sạch, đồng nhất mọi máy, và đúng cách làm industry.</p>
+
+  <p>Theo <a href="https://docs.docker.com/reference/compose-file/" target="_blank">tài liệu Docker Compose</a>, file <code>docker-compose.yml</code> khai báo các container của dự án dưới dạng mã — cả nhóm đều dùng được, không cần cài thủ công.</p>
+
+  <p>Với server đang chạy ở terminal 1, mở terminal mới và tạo file <code>docker-compose.yml</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">docker-compose.yml</span>
+<pre><code><span class="cmt"># Khai báo container PostgreSQL cho dự án e-learning</span>
+services:
+  postgres:
+    image: postgres:16-alpine              <span class="cmt"># bản PostgreSQL 16, nhẹ (alpine)</span>
+    container_name: elearning-postgres      <span class="cmt"># tên container để dễ nhận diện</span>
+    environment:                           <span class="cmt"># biến môi trường cho PostgreSQL khởi tạo</span>
+      POSTGRES_USER: elearning              <span class="cmt"># tài khoản admin của database</span>
+      POSTGRES_PASSWORD: elearning_dev_password <span class="cmt"># mật khẩu — chỉ cho dev, bài sau học cách giấu</span>
+      POSTGRES_DB: elearning                <span class="cmt"># tên database mặc định</span>
+    ports:
+      - <span class="str">"5432:5432"</span>          <span class="cmt"># mở cổng 5432 của máy ra container 5432</span>
+    volumes:
+      - pgdata:/var/lib/postgresql/data    <span class="cmt"># lưu data vào ổ "pgdata" — không mất khi tắt container</span>
+
+volumes:
+  pgdata:                                   <span class="cmt"># khai báo ổ lưu trữ bền vững</span></code></pre>
+  </div>
+
+  <h2>9. Khởi động PostgreSQL và kiểm tra kết nối</h2>
+  <p>Lệnh sau tải image (lần đầu), tạo container, và chạy nó nền:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash</span>
+<pre><code><span class="cmt"># Dựng và chạy các container đã khai báo trong docker-compose.yml</span>
+docker compose up -d</code></pre>
+  </div>
+
+  <p>Container tên <code>elearning-postgres</code> sẽ chạy. Kiểm tra nó sẵn sàng nhận kết nối:</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — kiểm tra PostgreSQL bên trong container</span>
+<pre><code><span class="cmt"># Hỏi PostgreSQL "bạn sẵn sàng chưa?" bằng chính công cụ của nó</span>
+docker exec elearning-postgres pg_isready -U elearning</code></pre>
+  </div>
+
+  <p>Kết quả mong đợi:</p>
+
+  <div class="code-block">
+    <span class="code-label">output</span>
+<pre><code>/var/run/postgresql:5432 - accepting connections</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao PostgreSQL chạy trong Docker — không cài native?</div>
+    <p>So sánh: cài native là "một lần cho riêng máy này"; Docker là "mã nguồn cho mọi máy". Đồng nghiệp clone repo của bạn, gõ <code>docker compose up -d</code>, có ngay database y hệt — không cần đọc wiki 20 bước. Đây chính là tư duy infrastructure-as-code mà senior cần.</p>
+  </div>
+
+  <h2>10. File .gitignore — không commit rác</h2>
+  <p><code>node_modules/</code> (hàng nghìn file cài từ npm) và <code>.env</code> (bí mật) <strong>không bao giờ</strong> được đưa lên git. File <code>.gitignore</code> bảo git "kệ mấy thứ này":</p>
+
+  <div class="code-block">
+    <span class="code-label">.gitignore</span>
+<pre><code><span class="cmt"># Thư mục dependencies cài tự động từ npm — cài lại được bằng "npm install"</span>
+node_modules/
+
+<span class="cmt"># Code biên dịch — sinh ra từ source, không cần commit</span>
+dist/
+
+<span class="cmt"># Bí mật môi trường — bài 06+ sẽ dùng</span>
+.env</code></pre>
+  </div>
+
+  <h2>11. Checklist tự kiểm trước khi qua bài sau</h2>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Lệnh nào bật server và TỰ reload khi bạn sửa file?</div>
+    <button class="opt" data-correct="false" data-explain="npm start chạy tsx không watch — đúng cho production, nhưng sửa file phải chạy lại tay.">A. npm start</button>
+    <button class="opt" data-correct="true" data-explain="npm run dev dùng tsx watch — theo dõi file, reload tự động. Đúng chỗ để phát triển.">B. npm run dev</button>
+    <button class="opt" data-correct="false" data-explain="node src/server.ts thiếu tsx — file .ts chưa được Node hiểu trực tiếp.">C. node src/server.ts</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Làm sao chắc chắn database "thật sự" đang chạy, không phải chỉ đoán?</div>
+    <button class="opt" data-correct="true" data-explain="pg_isready hỏi trực tiếp PostgreSQL — nó trả lời 'accepting connections' là DB thật đã sẵn sàng. Bằng chứng, không phải cảm giác.">A. docker exec elearning-postgres pg_isready -U elearning</button>
+    <button class="opt" data-correct="false" data-explain="Chỉ thấy container tồn tại, chưa chứng minh database bên trong khởi động xong.">B. docker ps</button>
+    <button class="opt" data-correct="false" data-explain="docker compose up -d chỉ khởi động container — cần kiểm tra trạng thái bên trong như A.">C. docker compose up -d</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Server Node (TS) chạy, trả HTTP 200 tại <code>localhost:4000</code></li>
+      <li>PostgreSQL 16 chạy trong Docker, sẵn sàng nhận kết nối ở cổng 5432</li>
+      <li>Hiểu vì sao dùng <code>"type": "module"</code>, <code>tsx</code>, <code>strict: true</code>, Docker thay vì cài native</li>
+      <li>Biết đọc kết quả thật (pg_isready) thay vì đoán mò</li>
+    </ul>
+  </div>
+
+  <div class="callout danger">
+    <div class="ct">⚠️ Bắt buộc hoàn thành checklist này TRƯỚC khi sang bài 01</div>
+    <ul class="checklist">
+      <li>☐ <code>npm run dev</code> in ra <code>✅ Server chạy tại http://localhost:4000</code></li>
+      <li>☐ Mở <code>http://localhost:4000</code> thấy "E-Learning API đang chạy! 🚀"</li>
+      <li>☐ <code>curl -s -o /dev/null -w "%{http_code}" http://localhost:4000</code> in ra <code>200</code></li>
+      <li>☐ <code>docker exec elearning-postgres pg_isready -U elearning</code> in ra <code>accepting connections</code></li>
+      <li>☐ Có file <code>src/server.ts</code>, <code>tsconfig.json</code>, <code>docker-compose.yml</code>, <code>.gitignore</code></li>
+    </ul>
+    <p>Chưa đạt 100% → làm lại từ bước lỗi, đừng đi tiếp. Báo tôi nếu kẹt chỗ nào — tôi đọc machine thật của bạn để chỉ đúng.</p>
+  </div>
+
+  <h2>12. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Khi bạn gõ <code>http://localhost:4000</code> vào trình duyệt và nhận về "E-Learning API đang chạy! 🚀" — chuyện gì <strong>thực sự</strong> đã xảy ra giữa trình duyệt và server? Cái gì gọi là "request"? "response"? Và vì sao con số 200 lại "chuẩn" đến vậy?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 01 · HTTP là gì — request/response, method, status code, header</div>
+    <p class="nd">Bóc tách giao thức nền tảng của toàn bộ web — thứ mà bạn vừa chạm tay vào mà chưa hiểu.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="#" class="disabled">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Xong bài 00, gõ <code>ls</code> trong thư mục dự án và gửi tôi kết quả + output của 2 lệnh kiểm tra. Tôi sẽ xác nhận bạn sẵn sàng sang bài 01. Có gì chưa rõ, hỏi thoải mái — không có câu hỏi nào "ngu" ở đây.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
