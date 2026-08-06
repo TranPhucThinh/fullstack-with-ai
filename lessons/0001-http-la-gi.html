@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 01 · HTTP là gì — request/response, method, status code, header</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 0 · Bài 01</span>
+  <h1>HTTP là gì — request/response, method, status code, header</h1>
+  <p class="subtitle">Bóc tách giao thức nền tảng của toàn bộ web — thứ bạn vừa chạm tay vào ở Bài 00 mà chưa hiểu.</p>
+  <p class="meta-line">⏱ ~40 phút · 🎯 Mục tiêu: đọc được một request/response HTTP thật bằng mắt, giải thích được từng phần.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Ở Bài 00, bạn gõ <code>curl http://localhost:4000</code> và nhận về <code>200</code>. Con số 200 đó là một <strong>HTTP status code</strong> — một mảnh của giao thức HTTP. Bài này mở toàn bộ bức tranh: khi trình duyệt hoặc curl "nói chuyện" với server, chúng trao đổi đúng một thứ gọi là <strong>HTTP message</strong>. Hiểu nó là hiểu nền móng của mọi framework bạn sắp học.</p>
+  </div>
+
+  <h2>1. HTTP là gì — một "ngôn ngữ" giữa client và server</h2>
+  <p><strong>HTTP (HyperText Transfer Protocol)</strong> là giao thức — một bộ quy tắc — quy định cách một <strong>client</strong> (trình duyệt, curl, app mobile...) yêu cầu tài nguyên từ một <strong>server</strong> và cách server trả lời. Nó là "ngôn ngữ chung" mà mọi web server trên thế giới đều nói, nên bất kỳ client nào cũng nói chuyện được với bất kỳ server nào.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao cần một "ngôn ngữ chung"?</div>
+    <p>Nếu mỗi server tự bịa cách trả lời riêng, trình duyệt phải học hàng triệu "phương ngữ". HTTP chuẩn hóa: client gửi <strong>request</strong> theo khuôn, server trả <strong>response</strong> theo khuôn — ai cũng hiểu ai. Đây là lý do web "chạy được" ở quy mô toàn cầu.</p>
+  </div>
+
+  <p>Theo <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview" target="_blank">tài liệu MDN về HTTP</a>, HTTP là một giao thức client-server: client gửi request, server trả response. Mỗi request/response là một <strong>HTTP message</strong> có cấu trúc cố định.</p>
+
+  <h2>2. Cấu trúc một HTTP request</h2>
+  <p>Khi bạn gõ <code>curl http://localhost:4000</code>, curl gửi đi một request. Bạn có thể <strong>nhìn thấy nó bằng mắt</strong> bằng cờ <code>-v</code> (verbose). Chạy lệnh sau (server đang chạy ở terminal 1):</p>
+
+  <div class="code-block">
+    <span class="code-label">bash — terminal thứ hai</span>
+<pre><code><span class="cmt"># -v: in ra chi tiết request/response. -s: bỏ thanh tiến trình.</span>
+curl -sv http://localhost:4000</code></pre>
+  </div>
+
+  <p>Bạn sẽ thấy một khối như thế này (phần <code>></code> là request, phần <code><</code> là response):</p>
+
+  <div class="code-block">
+    <span class="code-label">output — request (phần >)</span>
+<pre><code>> GET / HTTP/1.1
+> Host: localhost:4000
+> User-Agent: curl/8.x.x
+> Accept: */*</code></pre>
+  </div>
+
+  <p>Một request HTTP gồm <strong>3 phần</strong>:</p>
+  <table class="data">
+    <thead><tr><th>Phần</th><th>Ví dụ</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Request line</strong></td><td><code>GET / HTTP/1.1</code></td><td>Method + đường dẫn + phiên bản HTTP</td></tr>
+      <tr><td><strong>Headers</strong></td><td><code>Host: localhost:4000</code></td><td>Thông tin phụ: ai gửi, gửi tới đâu, chấp nhận gì...</td></tr>
+      <tr><td><strong>Body</strong> (tuỳ chọn)</td><td><em>(trống ở GET)</em></td><td>Dữ liệu gửi lên — thường dùng khi POST/PUT</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao request line quan trọng nhất?</div>
+    <p>Nó chứa <strong>method</strong> (client muốn làm gì) và <strong>path</strong> (làm trên tài nguyên nào). Server đọc đúng 2 thứ này là biết phải xử lý ra sao. Phần còn lại là "gia vị" giúp server hiểu ngữ cảnh.</p>
+  </div>
+
+  <h2>3. HTTP methods — client "muốn làm gì"</h2>
+  <p>Method là động từ mô tả <strong>hành động</strong> client muốn server thực hiện. Có 4 method chính bạn sẽ dùng suốt sự nghiệp:</p>
+  <table class="data">
+    <thead><tr><th>Method</th><th>Ý nghĩa</th><th>Ví dụ dùng</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET</code></td><td>Lấy dữ liệu (không thay đổi gì)</td><td>Xem danh sách khóa học</td></tr>
+      <tr><td><code>POST</code></td><td>Tạo tài nguyên mới</td><td>Đăng ký tài khoản</td></tr>
+      <tr><td><code>PUT</code></td><td>Thay thế toàn bộ tài nguyên</td><td>Cập nhật toàn bộ hồ sơ</td></tr>
+      <tr><td><code>DELETE</code></td><td>Xóa tài nguyên</td><td>Xóa khóa học</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao phân biệt method quan trọng?</div>
+    <p>Vì nó quyết định <strong>tính an toàn và tính đơn điệu (idempotency)</strong> — khái niệm senior phải nắm. <code>GET</code> an toàn (không đổi dữ liệu), <code>DELETE</code> đơn điệu (gọi 10 lần cũng như 1 lần). Bài 02 (REST) và Bài 43 (transaction) sẽ đào sâu. Giờ chỉ cần nhớ: <strong>method nói lên ý định</strong>.</p>
+  </div>
+
+  <h2>4. HTTP status codes — server "trả lời thế nào"</h2>
+  <p>Server trả lời bằng một <strong>status code</strong> — 3 chữ số tóm tắt kết quả. Bạn đã thấy <code>200</code> ở Bài 00. Các nhóm chính:</p>
+  <table class="data">
+    <thead><tr><th>Nhóm</th><th>Ý nghĩa</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><strong>2xx</strong></td><td>Thành công</td><td><code>200 OK</code>, <code>201 Created</code></td></tr>
+      <tr><td><strong>3xx</strong></td><td>Chuyển hướng</td><td><code>301 Moved Permanently</code></td></tr>
+      <tr><td><strong>4xx</strong></td><td>Lỗi phía client</td><td><code>400 Bad Request</code>, <code>404 Not Found</code></td></tr>
+      <tr><td><strong>5xx</strong></td><td>Lỗi phía server</td><td><code>500 Internal Server Error</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Status" target="_blank">MDN — HTTP response status codes</a>, status code là phần đầu của dòng trạng thái trong response, cho client biết request thành công hay thất bại và theo hướng nào.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao phải nhớ "nhóm" chứ không học thuộc từng mã?</div>
+    <p>Vì khi gặp mã lạ (vd <code>418</code>), bạn vẫn biết nó thuộc nhóm 4xx → lỗi phía client. Nhóm là "bộ khung", mã cụ thể là chi tiết. Senior không thuộc lòng 60 mã — họ đọc nhóm là đoán được vấn đề.</p>
+  </div>
+
+  <h2>5. Cấu trúc một HTTP response</h2>
+  <p>Phần <code><</code> trong output <code>curl -v</code> là response — server trả lời:</p>
+
+  <div class="code-block">
+    <span class="code-label">output — response (phần <)</span>
+<pre><code>< HTTP/1.1 200 OK
+< Content-Type: text/plain; charset=utf-8
+< Date: ...
+< Connection: keep-alive
+< Content-Length: 28
+
+E-Learning API đang chạy! 🚀</code></pre>
+  </div>
+
+  <p>Response gồm <strong>3 phần</strong>:</p>
+  <table class="data">
+    <thead><tr><th>Phần</th><th>Ví dụ</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Status line</strong></td><td><code>HTTP/1.1 200 OK</code></td><td>Phiên bản + status code + lý do</td></tr>
+      <tr><td><strong>Headers</strong></td><td><code>Content-Type: text/plain</code></td><td>Mô tả response: kiểu dữ liệu, độ dài...</td></tr>
+      <tr><td><strong>Body</strong></td><td><code>E-Learning API đang chạy! 🚀</code></td><td>Nội dung thật trả về</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao <code>Content-Type</code> quan trọng?</div>
+    <p>Nó báo cho client <strong>cách đọc body</strong>. Trong <code>src/server.ts</code> bạn ghi <code>'Content-Type': 'text/plain; charset=utf-8'</code> — nghĩa là "đây là văn bản thường, mã UTF-8". Nếu server trả JSON mà quên set <code>application/json</code>, client sẽ không biết parse. Bài 03 (JSON) sẽ đào sâu.</p>
+  </div>
+
+  <h2>6. Headers — "gia vị" của request và response</h2>
+  <p>Headers là các cặp <code>Tên: Giá trị</code> mang thông tin phụ. Một số bạn sẽ gặp nhiều:</p>
+  <table class="data">
+    <thead><tr><th>Header</th><th>Xuất hiện ở</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>Host</code></td><td>Request</td><td>Server nào (tên miền + cổng)</td></tr>
+      <tr><td><code>Content-Type</code></td><td>Cả hai</td><td>Kiểu dữ liệu của body</td></tr>
+      <tr><td><code>Content-Length</code></td><td>Cả hai</td><td>Độ dài body (byte)</td></tr>
+      <tr><td><code>Authorization</code></td><td>Request</td><td>Chứng thực — bài 14+ sẽ dùng</td></tr>
+      <tr><td><code>Set-Cookie</code></td><td>Response</td><td>Server bảo client lưu cookie</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Đọc được một request/response HTTP thật bằng mắt (<code>curl -v</code>)</li>
+      <li>Phân biệt 3 phần của request (request line, headers, body) và response (status line, headers, body)</li>
+      <li>Biết 4 method chính (GET/POST/PUT/DELETE) và ý nghĩa từng nhóm status code (2xx/3xx/4xx/5xx)</li>
+      <li>Hiểu vì sao <code>Content-Type</code> quyết định cách client đọc body</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Bạn gõ <code>curl http://localhost:4000</code> và nhận về <code>404</code>. Điều đó nghĩa là gì?</div>
+    <button class="opt" data-correct="false" data-explain="500 mới là lỗi phía server. 404 thuộc nhóm 4xx — lỗi phía client.">A. Server bị lỗi nội bộ</button>
+    <button class="opt" data-correct="true" data-explain="404 = Not Found, thuộc nhóm 4xx (lỗi client) — tài nguyên bạn yêu cầu không tồn tại ở server.">B. Tài nguyên bạn yêu cầu không tồn tại</button>
+    <button class="opt" data-correct="false" data-explain="201 Created là khi tạo tài nguyên mới thành công — thuộc nhóm 2xx.">C. Tài nguyên đã được tạo thành công</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Bạn muốn viết API "đăng ký tài khoản mới" — tạo một user trong database. Method nào phù hợp nhất?</div>
+    <button class="opt" data-correct="false" data-explain="GET chỉ để lấy dữ liệu, không được phép thay đổi gì — dùng GET để tạo user là sai ý nghĩa.">A. GET</button>
+    <button class="opt" data-correct="true" data-explain="POST dùng để tạo tài nguyên mới — đúng ý nghĩa 'đăng ký tài khoản'. Server thường trả 201 Created.">B. POST</button>
+    <button class="opt" data-correct="false" data-explain="DELETE dùng để xóa tài nguyên — ngược với việc tạo mới.">C. DELETE</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Server trả về body là JSON nhưng quên set <code>Content-Type: application/json</code>. Chuyện gì xảy ra?</div>
+    <button class="opt" data-correct="false" data-explain="Server vẫn gửi body — nhưng client không biết cách đọc nó, nên không phải 'không gửi'.">A. Server không gửi body</button>
+    <button class="opt" data-correct="true" data-explain="Content-Type báo client cách đọc body. Thiếu nó, client không biết parse JSON — có thể coi là text thường và xử lý sai.">B. Client không biết cách đọc body — có thể parse sai</button>
+    <button class="opt" data-correct="false" data-explain="Status code vẫn 200 — lỗi này không làm đổi status, mà làm client hiểu sai nội dung.">C. Server trả về lỗi 500</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa thấy <code>GET / HTTP/1.1</code> — method <code>GET</code> và đường dẫn <code>/</code>. Nhưng một hệ thống e-learning có hàng chục "tài nguyên": khóa học, người dùng, bài giảng... Làm sao để thiết kế đường dẫn (<code>/courses</code>, <code>/users</code>...) và method sao cho <strong>có ý nghĩa, nhất quán, và dễ đoán</strong>? Đó chính là <strong>REST API</strong> — bài tiếp theo.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 02 · REST API — resource, URL design</div>
+    <p class="nd">Biến HTTP thành một ngôn ngữ thiết kế API có quy tắc — nền tảng cho mọi endpoint bạn sắp viết.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0000-moi-truong-du-an.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy <code>curl -sv http://localhost:4000</code> và gửi tôi output — tôi sẽ xác nhận bạn đọc đúng từng phần. Có gì chưa rõ về request/response/method/status code, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
