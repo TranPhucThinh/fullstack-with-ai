@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 04 · Node.js là gì — event loop, non-blocking I/O</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 1 · Bài 04</span>
+  <h1>Node.js là gì — event loop, non-blocking I/O</h1>
+  <p class="subtitle">Hiểu trái tim của Node: vì sao một luồng đơn (single-thread) có thể xử lý hàng nghìn request, và cái giá phải trả là gì.</p>
+  <p class="meta-line">⏱ ~50 phút · 🎯 Mục tiêu: giải thích được event loop là gì, phân biệt blocking vs non-blocking, và viết code chứng minh được sự khác biệt.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 03 bạn viết server với <code>req.on('data')</code> — bạn gom body bằng cách <strong>lắng nghe sự kiện</strong>, không phải chờ đợi. Tại sao lại viết kiểu đó? Vì Node không block khi đọc dữ liệu — nó nói "có data thì gọi tôi" rồi đi làm việc khác. Đó chính là <strong>non-blocking I/O</strong> và <strong>event loop</strong> — trái tim của Node.js.</p>
+  </div>
+
+  <h2>1. Node.js là gì — V8 + libuv</h2>
+  <p>Theo <a href="https://nodejs.org/en/learn/getting-started/introduction-to-nodejs" target="_blank">Node.js giới thiệu</a>, Node.js là một runtime JavaScript được xây trên <strong>V8</strong> (engine của Chrome) và <strong>libuv</strong> (thư viện C xử lý I/O bất đồng bộ).</p>
+
+  <p>Hai thành phần quyết định mọi thứ:</p>
+
+  <table class="data">
+    <thead><tr><th>Thành phần</th><th>Vai trò</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><strong>V8</strong></td><td>Biên dịch và chạy JavaScript — nhanh vì JIT-compiled</td><td>Biểu thức <code>1 + 1</code>, gọi hàm, tạo object</td></tr>
+      <tr><td><strong>libuv</strong></td><td>Xử lý I/O bất đồng bộ — đọc file, network, timer</td><td><code>fs.readFile</code>, <code>http.createServer</code>, <code>setTimeout</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao lại cần libuv?</div>
+    <p>JavaScript trong trình duyệt chỉ có event loop cơ bản (click, fetch). Còn Node cần đọc file, connect database, làm network — những thứ đó là <strong>system calls</strong> của OS. libuv là lớp trung gian: Node gọi libuv, libuv gọi OS, rồi báo "xong rồi" qua callback. Nếu không có libuv, Node không thể làm I/O — nó chỉ là V8 chạy đơn thuần.</p>
+  </div>
+
+  <h2>2. Single-thread — vì sao một luồng lại "kỳ diệu"?</h2>
+  <p>JavaScript trong Node chạy trên <strong>một luồng (single thread)</strong>. Nghĩa là tại một thời điểm, chỉ có một dòng code JavaScript được thực thi. Không có hai biến đếm tăng đồng thời, không có race condition trong code của bạn.</p>
+
+  <p>Nhưng nếu chỉ một luồng, làm sao server xử lý được 1000 request cùng lúc? Câu trả lời: <strong>Node không xử lý 1000 request cùng lúc — nó "trả lời" chúng theo lượt, nhưng không bao giờ chờ đợi I/O</strong>.</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/blocking-vs-nonblocking.mjs — tạo thư mục demo trước</span>
+<pre><code><span class="cmt">// 📁 Tạo thư mục mới: mkdir -p elearning-backend/demo</span>
+<span class="cmt">// File: demo/blocking-vs-nonblocking.mjs</span>
+
+<span class="kw">import</span> { readFileSync, readFile } <span class="kw">from</span> <span class="str">'node:fs'</span>
+<span class="kw">import</span> { fileURLToPath } <span class="kw">from</span> <span class="str">'node:url'</span>
+<span class="kw">import</span> path <span class="kw">from</span> <span class="str">'node:path'</span>
+
+<span class="kw">const</span> __dirname = path.<span class="fn">dirname</span>(fileURLToPath(<span class="kw">import</span>.meta.url))
+<span class="kw">const</span> filePath = path.<span class="fn">join</span>(__dirname, <span class="str">'sample.txt'</span>)
+
+<span class="cmt">// ===== BLOCKING — đọc xong mới làm việc khác =====</span>
+<span class="cmt">// readFileSync: CHẶN luồng chính, không làm gì được cho tới khi đọc xong</span>
+<span class="fn">console</span>.log(<span class="str">'1. Bắt đầu đọc file (blocking)...'</span>)
+<span class="kw">const</span> dataSync = readFileSync(filePath, <span class="str">'utf-8'</span>)
+<span class="fn">console</span>.log(<span class="str">'2. Đọc xong:'</span>, dataSync.trim())
+<span class="fn">console</span>.log(<span class="str">'3. Dòng này chỉ chạy SAU khi đọc file xong'</span>)
+<span class="cmt">// ⛔ Output: 1 → 2 → 3 (tuần tự, không thể xen vào)</span>
+
+<span class="fn">console</span>.log(<span class="str">'---'</span>)
+
+<span class="cmt">// ===== NON-BLOCKING — đọc file, nhưng KHÔNG chờ =====</span>
+<span class="fn">console</span>.log(<span class="str">'4. Bắt đầu đọc file (non-blocking)...'</span>)
+readFile(filePath, <span class="str">'utf-8'</span>, (err, data) => {
+  <span class="cmt">// Callback này chạy SAU KHI file đọc xong — nhưng không chặn</span>
+  <span class="fn">console</span>.log(<span class="str">'6. Đọc xong (callback):'</span>, data.trim())
+})
+<span class="fn">console</span>.log(<span class="str">'5. Dòng này chạy NGAY, không chờ đọc file!'</span>)
+<span class="cmt">// ✅ Output: 4 → 5 → 6 (dòng 5 chạy ngay, dù file chưa đọc xong)</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Tạo file sample.txt trước khi chạy</div>
+    <p>Chạy lệnh sau trong <code>elearning-backend/</code>:</p>
+    <div class="code-block">
+      <span class="code-label">Terminal</span>
+<pre><code><span class="fn">echo</span> <span class="str">"Hello từ Node.js!"</span> > demo/sample.txt</code></pre>
+    </div>
+  </div>
+
+  <h2>3. Event loop — vũ điệu của các phase</h2>
+  <p>Event loop là một <strong>vòng lặp vô hạn</strong> mà Node chạy ngầm, liên tục kiểm tra: "có việc gì cần làm không?". Nó chia thành nhiều <strong>phase</strong>, mỗi phase xử lý một loại callback riêng.</p>
+
+  <p>Theo <a href="https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick" target="_blank">Node.js docs — Event Loop</a>, event loop có 6 phase, nhưng 3 phase quan trọng nhất với bạn:</p>
+
+  <table class="data">
+    <thead><tr><th>Phase</th><th>Xử lý</th><th>Code liên quan</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1. timers</strong></td><td>Callback của <code>setTimeout</code>, <code>setInterval</code> đã đến hạn</td><td><code>setTimeout(() => ..., 1000)</code></td></tr>
+      <tr><td><strong>2. poll</strong></td><td>I/O mới — đọc file, network, request đến</td><td><code>req.on('data')</code>, <code>fs.readFile</code></td></tr>
+      <tr><td><strong>3. check</strong></td><td>Callback của <code>setImmediate</code></td><td><code>setImmediate(() => ...)</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>Giữa các phase còn có <strong>microtask queue</strong> (xử lý Promise, <code>process.nextTick</code>) — ưu tiên cao hơn. Đây là lý do promise resolve trước setTimeout dù cùng thời gian.</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/event-loop-order.mjs — xem thứ tự chạy</span>
+<pre><code><span class="cmt">// File: demo/event-loop-order.mjs</span>
+<span class="fn">console</span>.log(<span class="str">'1. Code đồng bộ — chạy ngay ở phase hiện tại'</span>)
+
+<span class="cmt">// setTimeout: callback đưa vào phase timers</span>
+<span class="fn">setTimeout</span>(() => <span class="fn">console</span>.log(<span class="str">'2. setTimeout(0) — phase timers'</span>), <span class="num">0</span>)
+
+<span class="cmt">// setImmediate: callback đưa vào phase check</span>
+<span class="fn">setImmediate</span>(() => <span class="fn">console</span>.log(<span class="str">'3. setImmediate — phase check'</span>))
+
+<span class="cmt">// Promise.then: microtask — chạy NGAY sau code đồng bộ, trước phase tiếp</span>
+<span class="kw">Promise</span>.<span class="fn">resolve</span>().<span class="fn">then</span>(() => <span class="fn">console</span>.log(<span class="str">'4. Promise.then — microtask (ưu tiên hơn timer)'</span>))
+
+<span class="cmt">// process.nextTick: microtask — trong cùng một microtask queue, thứ tự chạy phụ thuộc vào version Node</span>
+process.nextTick(() => <span class="fn">console</span>.log(<span class="str">'5. process.nextTick — microtask CAO NHẤT'</span>))
+
+<span class="fn">console</span>.log(<span class="str">'6. Code đồng bộ — cũng chạy ngay'</span>)
+
+<span class="cmt">// Kết quả mong đợi: 1 → 6 → 5 → 4 → 2 (hoặc 3) → 3 (hoặc 2)</span>
+<span class="cmt">// ⚠️ Thứ tự giữa setTimeout(0) và setImmediate có thể khác nhau tuỳ phase hiện tại</span></code></pre>
+  </div>
+
+  <h2>4. Non-blocking I/O — lợi ích và cái giá</h2>
+  <p>Vì sao non-blocking I/O lại mạnh?</p>
+
+  <div class="code-block">
+    <span class="code-label">So sánh — blocking server (mỗi request chờ nhau)</span>
+<pre><code><span class="cmt">// Giả sử mỗi request mất 2s đọc database (I/O)</span>
+<span class="cmt">// BLOCKING: request 1 → chờ 2s → trả → request 2 → chờ 2s → trả</span>
+<span class="cmt">// 2 request mất 4s</span>
+
+<span class="cmt">// NON-BLOCKING (Node): request 1 → gửi truy vấn DB → request 2 → gửi truy vấn DB → DB1 xong → trả → DB2 xong → trả</span>
+<span class="cmt">// 2 request mất ~2s (xử lý song song ở tầng I/O)</span></code></pre>
+  </div>
+
+  <p>"Song song" ở tầng I/O, không phải ở code JavaScript của bạn. libuv dùng <strong>thread pool</strong> (mặc định 4 threads) để làm I/O nặng (đọc file, DNS). Network I/O thì dùng <strong>epoll/kqueue</strong> (cơ chế của OS) — không cần thread pool. Đó là lý do Node nhẹ: một tiến trình, không cần một thread cho mỗi kết nối như Apache.</p>
+
+  <div class="callout danger">
+    <div class="ct">⚠️ Cái giá của single-thread — CPU-bound task</div>
+    <p>Non-blocking I/O giúp ích cho I/O (đọc file, network, database). Nhưng nếu bạn có <strong>tác vụ nặng CPU</strong> (ví dụ: tính toán phức tạp, JSON.stringify file 1GB, vòng lặp 10 tỷ lần) — nó <strong>block toàn bộ event loop</strong>. Mọi request khác phải chờ. Giải pháp: <code>worker_threads</code> hoặc chia nhỏ tác vụ.</p>
+  </div>
+
+  <h2>5. Thực hành — chạy demo trên máy thật</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — tạo thư mục và chạy</span>
+<pre><code><span class="cmt"># Từ thư mục elearning-backend/</span>
+<span class="fn">mkdir</span> -p demo
+<span class="fn">echo</span> <span class="str">"Hello từ Node.js!"</span> > demo/sample.txt
+
+<span class="cmt"># 1. Chạy blocking vs non-blocking</span>
+<span class="fn">npx tsx</span> demo/blocking-vs-nonblocking.mjs
+
+<span class="cmt"># 2. Chạy event loop order</span>
+<span class="fn">npx tsx</span> demo/event-loop-order.mjs</code></pre>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Server nhận 2 request cùng lúc, mỗi request cần đọc file 1s. Với Node (non-blocking), 2 request mất khoảng bao lâu?</div>
+    <button class="opt" data-correct="false" data-explain="Nghe có vẻ hợp lý nhưng sai — Node không I/O song song kiểu đó, nhưng cũng không cộng dồn thời gian.">A. 0.5s</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Node gửi cả 2 truy vấn file cùng lúc xuống libuv, file nào xong trước trả trước. Tổng thời gian ≈ thời gian của I/O lâu nhất, không phải tổng.">B. ~1s</button>
+    <button class="opt" data-correct="false" data-explain="Sai — nếu cộng dồn thì đó là blocking. Node không chờ request 1 xong mới xử lý request 2.">C. 2s</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Điều nào sau đây SAI về event loop?</div>
+    <button class="opt" data-correct="false" data-explain="Đúng — Promise.then và process.nextTick là microtask, chạy trước khi chuyển phase.">A. Microtask (Promise.then) chạy trước callback của setTimeout</button>
+    <button class="opt" data-correct="true" data-explain="Đây là câu SAI. Node chỉ có một thread cho JavaScript, nhưng libuv có thread pool cho I/O. Nếu CPU-bound task (vd vòng lặp lớn), nó block toàn bộ event loop, không chỉ luồng chính.">B. Vì single-thread, Node chỉ dùng được một lõi CPU — CPU-bound task không ảnh hưởng tới các request khác</button>
+    <button class="opt" data-correct="false" data-explain="Đúng — setImmediate ở phase check, setTimeout ở phase timers. Nếu Node đang ở phase poll, setImmediate chạy trước.">C. Thứ tự giữa setTimeout(0) và setImmediate có thể thay đổi</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Code sau in ra thứ tự nào?</div>
+    <div class="code-block"><pre><code><span class="fn">console</span>.log(<span class="str">'A'</span>)
+<span class="fn">setTimeout</span>(() => <span class="fn">console</span>.log(<span class="str">'B'</span>), <span class="num">0</span>)
+<span class="kw">Promise</span>.<span class="fn">resolve</span>().<span class="fn">then</span>(() => <span class="fn">console</span>.log(<span class="str">'C'</span>))
+<span class="fn">console</span>.log(<span class="str">'D'</span>)</code></pre></div>
+    <button class="opt" data-correct="true" data-explain="Đúng! A và D là đồng bộ (chạy ngay). C là microtask (chạy ngay sau đồng bộ, trước phase timers). B là setTimeout ở phase timers (chạy cuối).">A. A → D → C → B</button>
+    <button class="opt" data-correct="false" data-explain="Sai — A chạy trước D (thứ tự code), và C là microtask nên chạy trước B.">B. D → A → C → B</button>
+    <button class="opt" data-correct="false" data-explain="Sai — B không chạy trước C vì C là microtask ưu tiên hơn timer phase.">C. A → B → D → C</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu Node.js = V8 (chạy JS) + libuv (I/O bất đồng bộ)</li>
+      <li>Phân biệt blocking (readFileSync) vs non-blocking (readFile) — và vì sao cái sau mạnh hơn</li>
+      <li>Biết event loop có các phase: timers → poll → check, và microtask ưu tiên hơn</li>
+      <li>Hiểu cái giá của single-thread: I/O thì tốt, CPU-bound thì block</li>
+    </ul>
+  </div>
+
+  <h2>6. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa thấy <code>import { readFileSync, readFile } from 'node:fs'</code> — Node có <strong>hai cách</strong> import: CJS (<code>require</code>) và ESM (<code>import</code>). Bài 03 dùng <code>"type": "module"</code> trong package.json, nhưng nếu không có dòng đó thì sao? Làm sao npm biết cài gói nào ở đâu? Đó là <strong>Module system (CJS/ESM), npm, package.json</strong> — bài tiếp theo.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 05 · Module system (CJS/ESM), npm, package.json</div>
+    <p class="nd">Hiểu vì sao có hai hệ thống module trong Node, cái gì quyết định import được bằng require hay import, và npm hoạt động thế nào.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0003-json-va-api-client.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy 2 file demo trong mục 5 và gửi output — tôi sẽ kiểm tra output có đúng thứ tự dự đoán không. Có gì chưa rõ về event loop hay non-blocking, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
