@@ -14,3 +14,6 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **HTTP method** | Động từ mô tả hành động client muốn server làm: GET (lấy), POST (tạo), PUT (thay thế), DELETE (xóa) | 01 |
 | **Content-Type** | Header báo kiểu dữ liệu của body — quyết định cách client đọc nội dung (vd `application/json`, `text/plain`) | 01 |
 | **REST API** | Phong cách thiết kế API dựa trên tài nguyên (resource) + HTTP method — URL có ý nghĩa, dễ đoán, nhất quán | 02 |
+| **resource (tài nguyên)** | Đối tượng trung tâm của REST API — mỗi thứ hệ thống quản lý (khóa học, người dùng, đơn hàng) là một resource, có URL riêng và được thao tác bằng HTTP method chuẩn | 02 |
+| **JSON** | Định dạng trao đổi dữ liệu chính của REST API, server trả về dạng `application/json`, client đọc và xử lý bằng `JSON.parse`/`JSON.stringify` | 02 |
+| **URL routing** | Kỹ thuật phân tích request URL để quyết định xử lý — dùng `new URL(req.url)` + regex để bắt path params như `:id` | 02 |
