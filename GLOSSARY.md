@@ -3,6 +3,11 @@
 Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23). Cập nhật cùng lúc với learning-record.
 
 | Thuật ngữ | Định nghĩa (tiếng Việt) | Bài |
+| **event loop** | Vòng lặp vô hạn của Node chia thành nhiều phase (timers, poll, check) — mỗi phase xử lý một loại callback riêng, microtask ưu tiên cao hơn | 04 |
+| **non-blocking I/O** | Cơ chế Node không chờ I/O hoàn thành — gửi yêu cầu xuống libuv rồi đi làm việc khác, khi I/O xong thì callback được đưa vào event loop | 04 |
+| **libuv** | Thư viện C xử lý I/O bất đồng bộ — dùng thread pool (cho file/DNS) và epoll/kqueue (cho network) | 04 |
+| **microtask** | Hàng đợi ưu tiên cao trong event loop — Promise.then, process.nextTick chạy trước timer/check phase | 04 |
+| **setImmediate** | Hàm Node đưa callback vào phase check của event loop — chạy sau I/O hiện tại | 04 |
 |-----------|--------------------------|-----|
 | **tsx** | Trình chạy TypeScript trực tiếp trên Node, không cần bước biên dịch riêng; `tsx watch` tự reload khi sửa file | 00 |
 | **rootDir** | Cấu hình tsconfig khai báo thư mục gốc của code nguồn — TS dựa vào đây để tái tạo cấu trúc thư mục trong `outDir` | 00 |
