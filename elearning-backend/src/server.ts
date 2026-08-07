@@ -11,6 +11,24 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`) // phân tích URL
   const path = url.pathname // lấy đường dẫn (path) từ URL
 
+// POST /api/courses — tạo khóa học mới (thêm vào mảng, chưa có database)
+  if (req.method === 'POST' && path === '/api/courses') {
+    let body = '' // gom body từ stream — Node http không tự parse
+    req.on('data', (chunk) => { body += chunk })
+    req.on('end', () => {
+      const data = JSON.parse(body) // parse chuỗi JSON thành object
+      const newId = courses.length > 0
+        ? Math.max(...courses.map((c) => c.id)) + 1
+        : 1
+      const course = { id: newId, title: data.title, price: data.price }
+      courses.push(course)
+
+      res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify(course))
+    })
+    return
+  }
+
   // Routing: so khớp path với từng tài nguyên
   if (req.method === 'GET' && path === '/api/courses') {
     // Trả danh sách khóa học dạng JSON

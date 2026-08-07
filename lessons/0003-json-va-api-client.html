@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 03 · JSON & API client (curl/Postman)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 0 · Bài 03</span>
+  <h1>JSON & API client (curl/Postman)</h1>
+  <p class="subtitle">Làm bạn với JSON — định dạng trao đổi dữ liệu của mọi API — và gọi API như một người chuyên nghiệp.</p>
+  <p class="meta-line">⏱ ~45 phút · 🎯 Mục tiêu: server của bạn nhận POST tạo khóa học mới qua JSON body, và bạn biết dùng curl + Postman để test API có tổ chức.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 02 server trả JSON qua <code>GET /api/courses</code>. Nhưng mới chỉ có <strong>đọc</strong>. Một e-learning platform cần <strong>tạo</strong> khóa học mới — client gửi JSON lên server, server nhận và xử lý. Đó là lúc bạn cần hiểu JSON sâu hơn và biết dùng công cụ gọi API ngoài curl.</p>
+  </div>
+
+  <h2>1. JSON là gì — cấu trúc, kiểu dữ liệu</h2>
+  <p><strong>JSON (JavaScript Object Notation)</strong> là định dạng văn bản nhẹ để trao đổi dữ liệu, dễ đọc với người và dễ parse với máy. Theo <a href="https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/JSON" target="_blank">MDN — JSON</a>, nó là "định dạng tuần tự hóa" — chuyển object trong bộ nhớ thành chuỗi để gửi qua mạng.</p>
+
+  <p>JSON có 4 kiểu cơ bản:</p>
+  <table class="data">
+    <thead><tr><th>Kiểu</th><th>Ví dụ</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td><code>string</code></td><td><code>"NestJS cơ bản"</code></td><td>Luôn trong dấu nháy kép <code>"</code>, không dùng nháy đơn</td></tr>
+      <tr><td><code>number</code></td><td><code>500000</code></td><td>Số nguyên hoặc thập phân, không có dấu nháy</td></tr>
+      <tr><td><code>boolean</code></td><td><code>true</code> / <code>false</code></td><td>Chữ thường, không nháy</td></tr>
+      <tr><td><code>null</code></td><td><code>null</code></td><td>Giá trị rỗng, không nháy</td></tr>
+    </tbody>
+  </table>
+
+  <p>JSON có 2 cấu trúc lồng ghép:</p>
+  <ul>
+    <li><strong>Object</strong> <code>{...}</code> — cặp key-value, key là string trong nháy kép</li>
+    <li><strong>Array</strong> <code>[...]</code> — danh sách có thứ tự, có thể chứa object lồng nhau</li>
+  </ul>
+
+  <div class="code-block">
+    <span class="code-label">JSON — dữ liệu mẫu một khóa học</span>
+<pre><code>{
+  <span class="str">"id"</span>: <span class="num">1</span>,
+  <span class="str">"title"</span>: <span class="str">"NestJS cơ bản"</span>,
+  <span class="str">"price"</span>: <span class="num">500000</span>,
+  <span class="str">"published"</span>: <span class="kw">true</span>,
+  <span class="str">"tags"</span>: [<span class="str">"nestjs"</span>, <span class="str">"backend"</span>],
+  <span class="str">"instructor"</span>: <span class="kw">null</span>
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 JSON khác JavaScript object thế nào?</div>
+    <p>JS object có thể có key <strong>không nháy</strong> (<code>{name: "A"}</code>), có <code>undefined</code>, function, Date. JSON thì <strong>chỉ</strong> string, number, boolean, null, object, array. Key <strong>luôn</strong> trong nháy kép. Đây là thiết kế cố ý: JSON là định dạng <strong>trung gian</strong> giữa các ngôn ngữ, không phải tính năng của riêng JS.</p>
+  </div>
+
+  <h2>2. JSON trong HTTP — request body & response body</h2>
+  <p>Khi client gửi dữ liệu lên server (POST/PUT), dữ liệu đó nằm trong <strong>request body</strong>. Server cần biết body là JSON để parse đúng — header <code>Content-Type: application/json</code> làm nhiệm vụ đó.</p>
+
+  <p>Quy trình gửi JSON qua HTTP:</p>
+  <ol>
+    <li>Client tạo object JS → <code>JSON.stringify(obj)</code> → chuỗi JSON</li>
+    <li>Gửi kèm header <code>Content-Type: application/json</code></li>
+    <li>Server đọc body → <code>JSON.parse(rawBody)</code> → object JS</li>
+    <li>Server xử lý, trả về JSON response</li>
+  </ol>
+
+  <p>Theo <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type" target="_blank">MDN — Content-Type</a>, <code>application/json</code> là media type chuẩn của JSON.</p>
+
+  <h2>3. Thực hành — thêm POST /api/courses vào server</h2>
+  <p>Mở <code>elearning-backend/src/server.ts</code>, thêm route POST vào routing block. Server cần đọc body từ request (Node thuần không làm việc này tự động — phải gom chunk).</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm routing POST</span>
+<pre><code><span class="cmt">// Đặt KHỐI NÀY trước 2 route GET, sau khai báo courses array</span>
+
+<span class="kw">if</span> (req.method === <span class="str">'POST'</span> &amp;&amp; path === <span class="str">'/api/courses'</span>) {
+  <span class="cmt">// Gom body từ stream — Node http không tự parse body</span>
+  <span class="kw">let</span> body = <span class="str">''</span>
+  req.on(<span class="str">'data'</span>, (chunk) => { body += chunk }) <span class="cmt">// gom từng mảnh dữ liệu</span>
+  req.on(<span class="str">'end'</span>, () => {
+    <span class="kw">const</span> data = <span class="fn">JSON.parse</span>(body) <span class="cmt">// parse chuỗi JSON thành object</span>
+
+    <span class="cmt">// Tạo id mới: max id hiện có + 1</span>
+    <span class="kw">const</span> newId = courses.length > <span class="num">0</span>
+      ? <span class="fn">Math.max</span>(...courses.map(<span class="fn">c</span> => c.id)) + <span class="num">1</span>
+      : <span class="num">1</span>
+
+    <span class="kw">const</span> course = { id: newId, title: data.title, price: data.price }
+    courses.push(course) <span class="cmt">// thêm vào mảng (trong bộ nhớ — bài 12 mới có DB)</span>
+
+    res.writeHead(<span class="num">201</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json; charset=utf-8'</span> })
+    res.end(JSON.stringify(course)) <span class="cmt">// trả về course vừa tạo</span>
+  })
+  <span class="kw">return</span>
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Express làm việc này tự động</div>
+    <p>Bạn thấy phải gom body thủ công bằng <code>req.on('data')</code> + <code>req.on('end')</code>? Đây là lý do vì sao Express có <code>express.json()</code> middleware — nó làm việc này cho bạn. Nhưng bạn cần thấy "gốc" trước để hiểu Express giải quyết bài toán gì.</p>
+  </div>
+
+  <h2>4. Dùng curl với JSON body</h2>
+  <p>Curl có thể gửi request với <code>-X POST</code> (method), <code>-H</code> (header), <code>-d</code> (data body):</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — gửi POST tạo khóa học mới</span>
+<pre><code>curl -X POST http://localhost:4000/api/courses \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"title":"SQL cơ bản","price":300000}'</span></code></pre>
+  </div>
+
+  <p>Kết quả mong đợi — server trả JSON + HTTP 201:</p>
+  <div class="code-block">
+    <span class="code-label">Output</span>
+<pre><code>{<span class="str">"id"</span>:<span class="num">3</span>,<span class="str">"title"</span>:<span class="str">"SQL cơ bản"</span>,<span class="str">"price"</span>:<span class="num">300000</span>}</code></pre>
+  </div>
+
+  <p>Các flag curl hay dùng với API:</p>
+  <table class="data">
+    <thead><tr><th>Flag</th><th>Ý nghĩa</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><code>-X</code></td><td>Phương thức HTTP</td><td><code>-X POST</code></td></tr>
+      <tr><td><code>-H</code></td><td>Header</td><td><code>-H "Content-Type: application/json"</code></td></tr>
+      <tr><td><code>-d</code></td><td>Body dữ liệu</td><td><code>-d '{"key":"value"}'</code></td></tr>
+      <tr><td><code>-v</code></td><td>Verbose — xem request/response đầy đủ</td><td><code>-v</code></td></tr>
+      <tr><td><code>-i</code></td><td>In response headers</td><td><code>-i</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <div class="ct">✅ Mẹo: curl với pipe + jq</div>
+    <p>Nếu bạn có <code>jq</code> (brew install jq), pipe output qua <code>jq</code> để xem JSON đẹp hơn:
+    <code>curl -s http://localhost:4000/api/courses | jq</code></p>
+  </div>
+
+  <h2>5. API client — Postman / Insomnia</h2>
+  <p>curl rất mạnh nhưng mỗi request phải gõ lại. API client cho phép <strong>lưu</strong> bộ sưu tập request, tổ chức thành collection, share với team.</p>
+
+  <p>Hai công cụ phổ biến:</p>
+  <ul>
+    <li><strong><a href="https://www.postman.com/downloads/" target="_blank">Postman</a></strong> — phổ biến nhất, nhiều tính năng (environment, script, test automation)</li>
+    <li><strong><a href="https://insomnia.rest/download" target="_blank">Insomnia</a></strong> — nhẹ hơn, UI sạch, hỗ trợ GraphQL</li>
+  </ul>
+
+  <p>Dùng Postman/Insomnia, bạn tạo request:</p>
+  <ol>
+    <li>Method: <code>POST</code></li>
+    <li>URL: <code>http://localhost:4000/api/courses</code></li>
+    <li>Headers: <code>Content-Type: application/json</code></li>
+    <li>Body → raw → JSON → <code>{"title":"Design Pattern","price":700000}</code></li>
+    <li>Send → thấy response 201 + JSON</li>
+  </ol>
+
+  <div class="callout bridge">
+    <div class="ct">💡 Vì sao cần cả curl lẫn API client?</div>
+    <p>Curl nhanh cho một lần test, dễ copy vào tài liệu/hướng dẫn. API client cho workflow test có tổ chức, lưu lại để test regression. Senior biết cả hai — và chọn đúng công cụ cho đúng việc.</p>
+  </div>
+
+  <h2>6. Sanity check — chạy và kiểm tra</h2>
+  <p>Sau khi sửa <code>server.ts</code>, chạy lại server và kiểm tra:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — full test suite</span>
+<pre><code><span class="cmt"># 1. POST — tạo khóa học mới</span>
+curl -s -X POST http://localhost:4000/api/courses \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"title":"SQL cơ bản","price":300000}'</span>
+<span class="cmt"># → {"id":3,"title":"SQL cơ bản","price":300000} + HTTP 201</span>
+
+<span class="cmt"># 2. GET — kiểm tra danh sách có course mới</span>
+curl -s http://localhost:4000/api/courses
+<span class="cmt"># → 3 courses, gồm course id=3</span>
+
+<span class="cmt"># 3. POST — body không hợp lệ (thiếu title)</span>
+curl -s -X POST http://localhost:4000/api/courses \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"price":100000}'</span>
+<span class="cmt"># → {"id":4,"title":undefined,"price":100000} — lỗi: chưa validate</span></code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ct">⚠️ Bug cố ý — không validate</div>
+    <p>Bạn thấy test 3: gửi thiếu <code>title</code>, server vẫn tạo course với <code>title: undefined</code>. Đây là <strong>lỗi thiếu validation</strong> — server không kiểm tra body trước khi dùng. Express/NestJS có cơ chế validate (ví dụ: <code>class-validator</code>) — nhưng bài này nhấn mạnh: <strong>JSON.parse không đảm bảo dữ liệu đúng</strong>. Senior phải validate dữ liệu đầu vào.</p>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. JSON nào sau đây KHÔNG hợp lệ?</div>
+    <button class="opt" data-correct="false" data-explain="Hợp lệ — string, number, boolean, null đều là kiểu JSON hợp lệ.">A. {"name":"Alice","age":30,"active":true,"bio":null}</button>
+    <button class="opt" data-correct="true" data-explain="Function không phải kiểu JSON — JSON chỉ chấp nhận string, number, boolean, null, object, array.">B. {"name":"Alice","greet":function(){return "hi"}}</button>
+    <button class="opt" data-correct="false" data-explain="Hợp lệ — array lồng object, number, string là kiểu JSON chuẩn.">C. [{"id":1,"tags":["a","b"]},2,"hello"]</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Khi gửi POST JSON, thiếu header Content-Type: application/json thì chuyện gì xảy ra?</div>
+    <button class="opt" data-correct="false" data-explain="Server không tự biết body là JSON — không có magic tự suy luận.">A. Server vẫn parse đúng vì JSON là định dạng mặc định</button>
+    <button class="opt" data-correct="true" data-explain="Server không biết body là JSON, thường parse ra undefined hoặc để nguyên chuỗi — lỗi runtime.">B. Server không parse được JSON — body là raw string, JSON.parse(body) ném lỗi</button>
+    <button class="opt" data-correct="false" data-explain="Không có lỗi HTTP nào — server parse sai nhưng vẫn trả 200.">C. Server trả 400 Bad Request</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu JSON là gì, các kiểu dữ liệu, và vì sao JSON khác JavaScript object</li>
+      <li>Biết cơ chế gom body trong Node thuần (<code>req.on('data')</code> + <code>req.on('end')</code>)</li>
+      <li>Server có POST endpoint tạo khóa học mới — dự án tiến thêm một bước</li>
+      <li>Biết dùng curl với JSON body và Postman/Insomnia để test API có tổ chức</li>
+      <li>Nhận ra lỗi thiếu validation — dữ liệu đầu vào không bao giờ đáng tin</li>
+    </ul>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa thấy routing thủ công bằng <code>if (path === ...)</code> và gom body bằng <code>req.on('data')</code>. Cảm giác thế nào khi cứ thêm một endpoint là phải viết thêm một if-else? Làm sao để server <strong>không block</strong> khi xử lý hàng trăm request cùng lúc? Đó là <strong>Node.js event loop & non-blocking I/O</strong> — bài đầu tiên của Module 1.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 04 · Node.js là gì — event loop, non-blocking I/O</div>
+    <p class="nd">Hiểu trái tim của Node: vì sao một luồng đơn (single-thread) có thể xử lý hàng nghìn request, và cái giá phải trả là gì.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0002-rest-api.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy 3 lệnh curl ở mục 6 và gửi output — tôi sẽ verify. Cài Postman/Insomnia nếu bạn muốn thử workflow có tổ chức. Có gì chưa rõ về JSON, curl, hoặc body parsing, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
