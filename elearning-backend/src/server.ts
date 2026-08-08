@@ -1,10 +1,5 @@
 import { createServer } from 'node:http' // lấy hàm tạo web server từ module http của Node
-
-// Dữ liệu khóa học tạm — chưa có database, bài 12 sẽ thay bằng PostgreSQL
-const courses = [
-  { id: 1, title: 'NestJS cơ bản', price: 500000 },
-  { id: 2, title: 'Design Pattern cho Backend', price: 800000 },
-]
+import { courses, createCourseId } from './courses.js'
 
 // Tạo server: mỗi khi có request tới, hàm này được gọi
 const server = createServer((req, res) => {
@@ -17,9 +12,7 @@ const server = createServer((req, res) => {
     req.on('data', (chunk) => { body += chunk })
     req.on('end', () => {
       const data = JSON.parse(body) // parse chuỗi JSON thành object
-      const newId = courses.length > 0
-        ? Math.max(...courses.map((c) => c.id)) + 1
-        : 1
+      const newId = createCourseId() // tạo id mới cho khóa học
       const course = { id: newId, title: data.title, price: data.price }
       courses.push(course)
 

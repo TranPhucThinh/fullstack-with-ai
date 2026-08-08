@@ -8,7 +8,7 @@
 
 ## Máy thật (dò ngày 08/06/2026)
 - macOS Tahoe, shell zsh
-- Node v20.19.3 (LTS), npm 10.8.2, pnpm 10.33.0
+- Node v24.16.0 (LTS), npm 11.13.0, pnpm 10.33.0
 - Docker 29.1.5 (daemon RUNNING) — dùng cho PostgreSQL
 - git 2.50.1, Homebrew 6.0.2
 - CHƯA có PostgreSQL native → dùng Docker container

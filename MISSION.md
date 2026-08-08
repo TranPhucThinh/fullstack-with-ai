@@ -14,7 +14,7 @@
 - Học bằng tiếng Việt, **coi như chưa biết gì về backend — học từ gốc lên**: HTTP, Node.js thuần, Express từ nền tảng, RỒI mới tới NestJS
 - **Học + làm dự án song song** — mỗi bài đóng góp một mẩu CHẠY ĐƯỢC vào dự án e-learning, không học lý thuyết suông
 - Hiểu bản chất & vì sao, ghét học vẹt — muốn biết "dưới nền NestJS là gì" trước khi dùng
-- Máy: macOS, Node v20.19.3 LTS, Docker 29 (daemon chạy), git, pnpm, npm, Homebrew; chưa có PostgreSQL (dùng Docker container)
+- Máy: macOS, Node v24.16.0 LTS, Docker 29 (daemon chạy), git, pnpm, npm, Homebrew; chưa có PostgreSQL (dùng Docker container)
 - Giới hạn thời gian làm việc tại công ty → mỗi phiên nên vừa sức, có win rõ ràng
 
 ## Parallel project

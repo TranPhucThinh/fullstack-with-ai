@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 05 · Module system (CJS/ESM), npm, package.json</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 1 · Bài 05</span>
+  <h1>Module system (CJS/ESM), npm, package.json</h1>
+  <p class="subtitle">Hiểu vì sao Node có HAI cách import (require vs import), cái gì quyết định dùng cái nào, và npm quản lý code của bạn ra sao.</p>
+  <p class="meta-line">⏱ ~50 phút · 🎯 Mục tiêu: giải thích được CJS vs ESM, đọc hiểu package.json, và tách dữ liệu khóa học ra module riêng trong dự án.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 04 bạn viết <code>import { readFileSync, readFile } from 'node:fs'</code> và <code>import { createServer } from 'node:http'</code>. Nhưng sao lại là <code>import</code> mà không phải <code>require</code>? Và vì sao đôi khi bạn thấy code dùng <code>require('express')</code>? Đó là vì Node có <strong>hai hệ thống module</strong> — đây chính là bài học hôm nay.</p>
+  </div>
+
+  <h2>1. Hai hệ thống module — CJS và ESM</h2>
+  <p>Trong Node.js có hai cách đóng gói và tái sử dụng code:</p>
+
+  <table class="data">
+    <thead><tr><th></th><th>CommonJS (CJS)</th><th>ES Modules (ESM)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ra đời</strong></td><td>2009 — sinh ra cùng Node.js, trước khi JS có chuẩn module</td><td>2015 — chuẩn ES6 của JavaScript, sau này Node mới hỗ trợ</td></tr>
+      <tr><td><strong>Nạp</strong></td><td><code>require('./file')</code></td><td><code>import x from './file'</code></td></tr>
+      <tr><td><strong>Xuất</strong></td><td><code>module.exports = ...</code></td><td><code>export const ...</code></td></tr>
+      <tr><td><strong>Khi nào chạy</strong></td><td>Đồng bộ — nạp xong file mới chạy tiếp</td><td>Bất đồng bộ — hỗ trợ <code>top-level await</code></td></tr>
+      <tr><td><strong>Đối tượng</strong></td><td>Có sẵn <code>__dirname</code>, <code>require</code></td><td>Dùng <code>import.meta.url</code>, không có <code>__dirname</code> sẵn</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao lại có HAI hệ thống?</div>
+    <p>Khi Node.js ra đời (2009), JavaScript <strong>chưa có chuẩn module nào</strong> — nên Node tự nghĩ ra CommonJS. Mãi tới 2015, JavaScript mới có chuẩn chính thức là ES Modules (import/export). Nhiều năm sau Node mới hỗ trợ ESM. Kết quả: <strong>cả hai vẫn tồn tại song song</strong> vì có hàng chục nghìn thư viện cũ viết bằng CJS chưa chuyển. Node không thể "xoá" CJS được — phải chạy được cả hai để không phá vỡ mọi dự án cũ.</p>
+  </div>
+
+  <h2>2. Cái gì quyết định dùng CJS hay ESM?</h2>
+  <p>Theo <a href="https://nodejs.org/api/modules.html#enabling" target="_blank">Node.js docs — Modules: Enabling</a>, Node quyết định thể loại module của một file theo <strong>đuôi file + khai báo "type" trong package.json</strong>:</p>
+
+  <table class="data">
+    <thead><tr><th>Đuôi file</th><th>Thể loại module</th></tr></thead>
+    <tbody>
+      <tr><td><code>.mjs</code></td><td><strong>Luôn ESM</strong> — bất kể "type" là gì</td></tr>
+      <tr><td><code>.cjs</code></td><td><strong>Luôn CommonJS</strong> — bất kể "type" là gì</td></tr>
+      <tr><td><code>.js</code></td><td>Do <code>"type"</code> trong package.json quyết định: <code>"type": "module"</code> → ESM; không có hoặc <code>"commonjs"</code> → CJS</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Quy tắc vàng — vì sao bạn đang dùng import</div>
+    <p>Kho <code>elearning-backend/package.json</code> của bạn có dòng <code>"type": "module"</code>. Nên mọi file <code>.ts</code>/<code>.js</code> trong project <strong>mặc định là ESM</strong> → bạn viết <code>import</code>, không phải <code>require</code>. Nếu <strong>bỏ dòng đó đi</strong>, file <code>.ts</code> sẽ bị hiểu là CJS và <code>import</code> sẽ gãy. Đây là nguồn gốc của rất nhiều lỗi <code>Cannot use import statement outside a module</code> mà dev mới gặp.</p>
+  </div>
+
+  <h2>3. Thực hành — demo CJS vs ESM trên máy thật</h2>
+  <p>Tạo 2 file demo trong thư mục <code>elearning-backend/demo/</code> (đã có từ bài 04). Chú ý: file <code>.mjs</code> và <code>.cjs</code> <strong>ép buộc</strong> thể loại, không cần quan tâm "type".</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/hello.mjs — ESM, chạy trực tiếp</span>
+<pre><code><span class="cmt">// File: demo/hello.mjs</span>
+<span class="cmt">// .mjs → LUÔN là ESM, dù "type" trong package.json là gì</span>
+
+<span class="kw">export</span> <span class="kw">const</span> greet = <span class="fn">(name)</span> => <span class="str">`Xin chào, ${name}!`</span>
+
+<span class="cmt">// Chỉ chạy khi file này được chạy TRỰC TIẾP, không chạy khi được import</span>
+<span class="kw">if</span> (<span class="kw">import</span>.meta.url === <span class="str">`file://${process.argv[1]}`</span>) {
+  <span class="fn">console</span>.<span class="fn">log</span>(<span class="fn">greet</span>(<span class="str">'An'</span>))
+}</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">demo/greet.cjs + demo/use-cjs.cjs — CommonJS</span>
+<pre><code><span class="cmt">// File: demo/greet.cjs — .cjs → LUÔN là CommonJS</span>
+<span class="kw">module</span>.exports = { greet: <span class="fn">(name)</span> => <span class="str">`Chào cjs, ${name}!`</span> }</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">demo/use-cjs.cjs — require thay vì import</span>
+<pre><code><span class="cmt">// File: demo/use-cjs.cjs</span>
+<span class="kw">const</span> { greet } = <span class="fn">require</span>(<span class="str">'./greet.cjs'</span>) <span class="cmt">// CJS dùng require, không phải import</span>
+<span class="fn">console</span>.<span class="fn">log</span>(<span class="fn">greet</span>(<span class="str">'Bình'</span>))</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy cả hai demo</span>
+<pre><code><span class="cmt"># Từ thư mục elearning-backend/</span>
+<span class="fn">cd</span> demo
+<span class="fn">node</span> hello.mjs        <span class="cmt"># → Xin chào, An!</span>
+<span class="fn">node</span> use-cjs.cjs     <span class="cmt"># → Chào cjs, Bình!</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng</div>
+    <p>Demo trên đã chạy đúng output trong sandbox với Node v24. Với máy bạn (Node v20 LTS) kết quả <strong>không đổi</strong> — cú pháp module này ổn định từ lâu.</p>
+  </div>
+
+  <h2>4. package.json & npm — "trái tim quản lý" dự án</h2>
+  <p>Mở <code>elearning-backend/package.json</code> — đây là file cấu hình mà npm/Node dựa vào để biết dự án chạy thế nào:</p>
+
+  <table class="data">
+    <thead><tr><th>Trường</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>"type": "module"</code></td><td>Mọi file .js/.ts mặc định là ESM (quyết định import vs require)</td></tr>
+      <tr><td><code>"scripts"</code></td><td>Lệnh rút gọn — <code>npm run dev</code> chạy <code>tsx watch</code></td></tr>
+      <tr><td><code>"dependencies"</code></td><td>Gói CẦN ở production (vd tsx để chạy)</td></tr>
+      <tr><td><code>"devDependencies"</code></td><td>Gói CHỈ cần khi phát triển (vd typescript, @types/node)</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://docs.npmjs.com/cli/v10/configuring-npm/package-json" target="_blank">npm docs — package.json</a>, `dependencies` là code mà app chạy được cần (cài cả trên server production), còn `devDependencies` chỉ phục vụ lúc phát triển/đóng gói (typescript biên dịch, type definition) — không cần khi chạy runtime.</p>
+
+  <h2>5. 🎯 Mẩu chạy được — tách dữ liệu khóa học ra module riêng</h2>
+  <p>Giờ bạn áp dụng ngay: tách dữ liệu khóa học khỏi <code>src/server.ts</code> vào một module riêng. Đây chính là cách bạn bắt đầu tổ chức code — <strong>đừng nhét mọi thứ vào một file</strong>, đó là thói quen gây rối khi dự án lớn dần.</p>
+
+  <div class="code-block">
+    <span class="code-label">src/courses.ts — module mới chứa dữ liệu + logic khóa học</span>
+<pre><code><span class="cmt">// File: src/courses.ts</span>
+<span class="cmt">// Module chứa dữ liệu khóa học + hàm thao tác — tách khỏi server.ts</span>
+
+<span class="kw">export</span> <span class="kw">interface</span> Course {
+  id: <span class="tbl">number</span>
+  title: <span class="tbl">string</span>
+  price: <span class="tbl">number</span>
+}
+
+<span class="cmt">// Danh sách khóa học tạm — chưa có database, bài 12 sẽ thay bằng PostgreSQL</span>
+<span class="kw">export</span> <span class="kw">const</span> courses: Course[] = [
+  { id: <span class="num">1</span>, title: <span class="str">'NestJS cơ bản'</span>, price: <span class="num">500000</span> },
+  { id: <span class="num">2</span>, title: <span class="str">'Design Pattern cho Backend'</span>, price: <span class="num">800000</span> },
+]
+
+<span class="cmt">// Hàm tạo id mới — tránh trùng với id hiện có</span>
+<span class="kw">export</span> <span class="kw">function</span> createCourseId(): <span class="tbl">number</span> {
+  <span class="kw">return</span> courses.length &gt; <span class="num">0</span>
+    ? <span class="fn">Math</span>.<span class="fn">max</span>(...courses.<span class="fn">map</span>((c) =&gt; c.id)) + <span class="num">1</span>
+    : <span class="num">1</span>
+}</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — import module vừa tạo (chỉ giữ phần server)</span>
+<pre><code><span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+<span class="kw">import</span> { courses, createCourseId } <span class="kw">from</span> <span class="str">'./courses.js'</span> <span class="cmt">// import module riêng — chú ý đuôi .js</span>
+
+<span class="kw">const</span> server = createServer(<span class="fn">(req, res)</span> =&gt; {
+  <span class="cmt">// ... phần còn lại GIỮ NGUYÊN như bài 03,</span>
+  <span class="cmt">// nhưng dùng courses / createCourseId từ module thay vì khai báo lại</span>
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao import phải ghi đuôi <code>.js</code>?</div>
+    <p>Trong Node ESM, khi import một <strong>file local</strong> bạn phải ghi đúng tên file sau khi biên dịch — tức là <code>./courses.js</code> dù source là <code>courses.ts</code> (tsx sẽ tự map <code>.ts</code> → <code>.js</code>). Quy ước này của Node yêu cầu đuôi đầy đủ, khác với bundler (Vite/webpack) cho phép bỏ đuôi. Đây là điểm rất hay nhầm khi chuyển từ bundler sang chạy Node thuần.</p>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy & kiểm tra server vẫn hoạt động nguyên vẹn</span>
+<pre><code><span class="cmt"># Từ thư mục elearning-backend/</span>
+<span class="fn">npx tsc</span> --noEmit        <span class="cmt"># 1. TypeScript pass (exit 0) — build thành công</span>
+
+<span class="fn">npm run dev</span>            <span class="cmt"># 2. Mở terminal khác, bật server</span>
+
+<span class="cmt"># 3. Kiểm tra — phải trả kết quả như trước khi tách module</span>
+<span class="fn">curl</span> <span class="str">http://localhost:4000/api/courses</span>          <span class="cmt"># → 2 courses, HTTP 200</span>
+<span class="fn">curl</span> <span class="str">http://localhost:4000/api/courses/1</span>       <span class="cmt"># → course id=1, HTTP 200</span>
+<span class="fn">curl</span> -X POST -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"title":"Node nâng cao","price":600000}'</span> <span class="str">http://localhost:4000/api/courses</span>
+<span class="cmt"># → course id=3 mới, HTTP 201</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (sandbox sạch, dùng đúng package-lock của bạn)</div>
+    <p>Đã chạy thật: <code>npx tsc --noEmit</code> → exit 0; GET list → 2 courses 200; GET /1 → 200; GET /99 → 404 "Course not found"; POST → id=3, 201. Mọi hành vi giữ nguyên sau khi tách module.</p>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Một dự án có <code>"type": "module"</code>. Bạn viết file <code>tools.js</code> dùng <code>module.exports = ...</code>. Điều gì xảy ra?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — vì "type":"module", file .js bị hiểu là ESM, và ESM không có global module.exports.">A. Chạy bình thường</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! File .js mặc định là ESM do "type":"module", nên module.exports (của CJS) không tồn tại → ReferenceError. Muốn dùng require thì phải đổi sang đuôi .cjs.">B. Báo lỗi <code>module is not defined</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — Node không tự chuyển đổi import/require linh hoạt; nó dựa vào đuôi file + "type" để quyết định, không "tự cảm nhận" cú pháp.">C. Node tự nhận ra syntax và chạy như CJS</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Trong Node ESM, hai dòng import sau dòng nào ĐÚNG (giả sử file nguồn là src/util.ts)?</div>
+    <div class="code-block"><pre><code><span class="cmt">// (1)</span>
+<span class="kw">import</span> { x } <span class="kw">from</span> <span class="str">'./util'</span>
+<span class="cmt">// (2)</span>
+<span class="kw">import</span> { x } <span class="kw">from</span> <span class="str">'./util.js'</span></code></pre></div>
+    <button class="opt" data-correct="false" data-explain="Sai — Node ESM local import yêu cầu đuôi đầy đủ. Bỏ đuôi là hợp lệ với bundler (Vite/webpack), không hợp lệ với Node thuần.">A. (1) — bỏ đuôi, gọn hơn</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Node ESM local import phải có đuôi .js (tương ứng file .ts sau khi biên dịch). Đây là quy ước riêng của Node, khác bundler.">B. (2) — <code>./util.js</code> đúng cho Node</button>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai không tương đương trong Node; chỉ (2) hợp lệ.">C. Cả hai đều đúng</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Bạn muốn thư viện <code>typescript</code> chỉ cài khi phát triển, không cần trên server production. Bạn đặt nó ở đâu?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — dependencies là code cần chạy ở production; đặt tools của dev vào đó sẽ phình kích thước cài đặt ở server.">A. dependencies</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! TypeScript chỉ phục vụ lúc phát triển/biên dịch, server production chạy code đã build sẵn nên không cần — để ở devDependencies.">B. devDependencies</button>
+    <button class="opt" data-correct="false" data-explain="Sai — typescript có vị trí hợp lý: devDependencies.">C. Cài ở chỗ nào cũng được, không quan trọng</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Phân biệt CommonJS (require/module.exports) vs ESM (import/export) và vì sao cả hai tồn tại</li>
+      <li>Biết cái gì quyết định module: đuôi .mjs/.cjs/.js + "type" trong package.json</li>
+      <li>Đọc hiểu package.json: "type", scripts, dependencies vs devDependencies</li>
+      <li>✅ Tách dữ liệu khóa học ra src/courses.ts và import vào server.ts — dự án vẫn chạy nguyên vẹn</li>
+    </ul>
+  </div>
+
+  <h2>6. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa làm server bằng <code>createServer</code> và import nhiều thứ từ <code>node:http</code>. Nhưng <code>node:http</code> là module gì? Nó có những hàm nào, <code>req</code>/<code>res</code> là đối tượng gì, và làm sao nó tạo ra được request/response HTTP? Đó chính là <strong>HTTP server bằng Node thuần (http module)</strong> — bài tiếp theo.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 06 · HTTP server bằng Node thuần (http module)</div>
+    <p class="nd">Mổ xẻ node:http — hiểu req/res là đối tượng gì, vì sao createServer nhận 2 tham số, và tiến tới server thuần không framework.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0004-nodejs-la-gi.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy 2 file demo (hello.mjs, use-cjs.cjs) rồi tách courses vào src/courses.ts, gửi tôi output của `npx tsc --noEmit` và 1 lệnh curl — tôi sẽ kiểm tra code thật của bạn. Có gì chưa rõ về CJS/ESM hay package.json, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>

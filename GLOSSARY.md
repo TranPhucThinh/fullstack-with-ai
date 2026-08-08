@@ -22,3 +22,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **resource (tài nguyên)** | Đối tượng trung tâm của REST API — mỗi thứ hệ thống quản lý (khóa học, người dùng, đơn hàng) là một resource, có URL riêng và được thao tác bằng HTTP method chuẩn | 02 |
 | **JSON** | Định dạng trao đổi dữ liệu chính của REST API, server trả về dạng `application/json`, client đọc và xử lý bằng `JSON.parse`/`JSON.stringify` | 02 |
 | **URL routing** | Kỹ thuật phân tích request URL để quyết định xử lý — dùng `new URL(req.url)` + regex để bắt path params như `:id` | 02 |
+| **CommonJS (CJS)** | Hệ thống module cũ của Node (2009) dùng `require`/`module.exports`, nạp đồng bộ — vẫn tồn tại song song với ESM vì nhiều thư viện cũ chưa chuyển | 05 |
+| **ES Modules (ESM)** | Chuẩn module chính thức của JavaScript (ES6, 2015) dùng `import`/`export`, nạp bất đồng bộ — file `.mjs` hoặc `"type":"module"` kích hoạt | 05 |
+| **package.json** | File cấu hình trái tim của dự án npm: khai `type` (module system), scripts, dependencies/devDependencies | 05 |
+| **devDependencies** | Gói chỉ cần khi phát triển (typescript, @types/node) — không cần trên server production | 05 |
+| **dependencies** | Gói cần để chạy ở production (vd tsx) | 05 |
+|**ESM local import đuôi .js** | Trong Node ESM, import file local phải ghi đủ đuôi `.js` (tương ứng `.ts` sau khi biên dịch) — khác bundler, hay gây lỗi khi chuyển ngữ cảnh | 05 |
