@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cheat-sheet · Node.js & Express</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../lessons/lesson.css">
+<style>
+  body { background: #0f1117; }
+  .wrap { max-width: 900px; }
+  h1 { font-size: 2rem; margin-bottom: 4px; }
+  .subtitle { margin-top: 0; }
+  .cheat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .cheat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .cheat-card h2 { font-size: 1rem; margin: 0 0 8px; padding: 0; border: none; display: flex; align-items: center; gap: 6px; }
+  .cheat-card h2::before { content: '▸'; color: var(--accent); }
+  .cheat-card table { font-size: 13px; }
+  .cheat-card table th { font-size: 11px; }
+  .cheat-card table td, .cheat-card table th { padding: 4px 8px; }
+  .cheat-card p, .cheat-card li { font-size: 13px; }
+  .cheat-card ul { padding-left: 16px; margin: 6px 0; }
+  .cheat-card code { font-size: 12px; }
+  .full-width { grid-column: 1 / -1; }
+  .ref-meta { text-align: center; color: var(--text-dim); font-size: 13px; margin: 10px 0 20px; }
+  @media print { .cheat-grid { page-break-after: always; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>📖 Cheat-sheet: Node.js & Express</h1>
+<p class="subtitle">Cô đọng kiến thức Module 1–2 — từ module system, HTTP thuần, fs/stream/env tới Express routing/middleware/error/CORS.</p>
+<p class="ref-meta">Bài 05–11 · Cập nhật 09/08/2026</p>
+
+<div class="cheat-grid">
+
+  <div class="cheat-card">
+    <h2>Module System (Bài 05)</h2>
+    <table class="data">
+      <thead><tr><th></th><th>CJS</th><th>ESM</th></tr></thead>
+      <tbody>
+        <tr><td>Import</td><td><code>require('x')</code></td><td><code>import x from 'x'</code></td></tr>
+        <tr><td>Export</td><td><code>module.exports = x</code></td><td><code>export default x</code> / <code>export { x }</code></td></tr>
+        <tr><td>Kích hoạt</td><td>Mặc định (.cjs)</td><td><code>.mjs</code> hoặc <code>"type":"module"</code></td></tr>
+        <tr><td>Local import</td><td><code>require('./x')</code></td><td><code>import './x.js'</code> — PHẢI đủ đuôi .js</td></tr>
+      </tbody>
+    </table>
+    <p>⚠️ ESM trong Node phải ghi đủ đuôi file local.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>HTTP Server Node thuần (Bài 06)</h2>
+    <div class="code-block">
+      <span class="code-label">Khởi tạo server</span>
+<pre><code><span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+<span class="kw">const</span> server = <span class="fn">createServer</span>(<span class="fn">(req, res)</span> => {
+  <span class="cmt">// req: IncomingMessage (Readable) · res: ServerResponse (Writable)</span>
+  res.writeHead(<span class="num">200</span>, { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> })
+  res.end(<span class="fn">JSON.stringify</span>({ ok: <span class="kw">true</span> }))
+})
+server.listen(<span class="num">4000</span>, <span class="str">'0.0.0.0'</span>)</code></pre>
+    </div>
+    <p><code>req</code> đọc body qua <code>data</code>/<code>end</code>; <code>res.end()</code> bắt buộc gọi đúng 1 lần.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Routing & Query (Bài 07)</h2>
+    <div class="code-block">
+      <span class="code-label">Bảng route + parse query</span>
+<pre><code><span class="kw">const</span> routes = [
+  { method: <span class="str">'GET'</span>, pattern: <span class="str">/^\/api\/courses$/</span>, handler: list },
+  { method: <span class="str">'GET'</span>, pattern: <span class="str">/^\/api\/courses\/(\d+)$/</span>, handler: get },
+]
+<span class="cmt">// query: url.search.slice(1) -> URLSearchParams</span></code></pre>
+    </div>
+    <p>→ Express gói gọn: <code>app.get('/api/courses/:id')</code> + <code>req.params</code>/<code>req.query</code>.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>fs & Stream (Bài 08)</h2>
+    <table class="data">
+      <thead><tr><th>Nhu cầu</th><th>Code</th></tr></thead>
+      <tbody>
+        <tr><td>Đọc cả file</td><td><code>await readFile(file, 'utf8')</code> (fs/promises)</td></tr>
+        <tr><td>Ghi file</td><td><code>await writeFile(file, data)</code></td></tr>
+        <tr><td>Stream đọc</td><td><code>createReadStream(file)</code></td></tr>
+        <tr><td>Nối stream</td><td><code>readStream.pipe(res)</code></td></tr>
+      </tbody>
+    </table>
+    <p><code>highWaterMark</code> (mặc định 64KB) = ngưỡng bộ đệm quyết định cỡ chunk. Là threshold, không phải limit.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>process & env (Bài 08)</h2>
+    <table class="data">
+      <thead><tr><th>Thứ</th><th>Ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td><code>process.env</code></td><td>Biến môi trường — tách cấu hình khỏi code</td></tr>
+        <tr><td><code>process.argv</code></td><td>Tham số dòng lệnh</td></tr>
+        <tr><td><code>process.cwd()</code></td><td>Thư mục hiện tại khi chạy</td></tr>
+        <tr><td><code>process.exitCode</code></td><td>Mã thoát — đặt thay vì gọi process.exit()</td></tr>
+      </tbody>
+    </table>
+    <p>Node 24: <code>loadEnvFile()</code> nạp <code>.env</code> vào process.env (không cần dotenv).</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Express Routing (Bài 09–10)</h2>
+    <div class="code-block">
+      <span class="code-label">Route + middleware cơ bản</span>
+<pre><code><span class="kw">const</span> app = <span class="fn">express</span>()
+app.<span class="fn">use</span>(<span class="fn">express.json</span>())
+app.<span class="fn">get</span>(<span class="str">'/api/courses/:id'</span>, (req, res) => {
+  res.<span class="fn">json</span>({ id: req.params.id })
+})
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, (req, res) => {
+  res.<span class="fn">status</span>(<span class="num">201</span>).<span class="fn">json</span>(req.body)
+})</code></pre>
+    </div>
+    <p><code>req.query</code> · <code>req.params</code> · <code>req.body</code> (cần express.json) · <code>res.status().json()</code>.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Middleware (Bài 11)</h2>
+    <div class="code-block">
+      <span class="code-label">Middleware thường + error-handler</span>
+<pre><code><span class="cmt">// Middleware thường — 3 tham số, phải gọi next()</span>
+app.<span class="fn">use</span>((req, res, next) => {
+  console.<span class="fn">log</span>(req.method, req.url)
+  <span class="fn">next</span>()
+})
+
+<span class="cmt">// Error-handler — ĐÚNG 4 tham số</span>
+app.<span class="fn">use</span>((err, req, res, next) => {
+  res.<span class="fn">status</span>(<span class="num">500</span>).<span class="fn">json</span>({ error: <span class="str">'Internal Server Error'</span> })
+})</code></pre>
+    </div>
+    <p>Thứ tự quan trọng: cors() đầu, error-handler cuối. Quên <code>next()</code> → request treo.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>CORS (Bài 11)</h2>
+    <div class="code-block">
+      <span class="code-label">Bật CORS cho frontend</span>
+<pre><code><span class="kw">import</span> cors <span class="kw">from</span> <span class="str">'cors'</span>
+app.<span class="fn">use</span>(<span class="fn">cors</span>()) <span class="cmt">// thêm header Access-Control-Allow-Origin vào mọi response</span></code></pre>
+    </div>
+    <p>Đặt ĐẦU TIÊN để header CORS phủ cả response lỗi. Production nên giới hạn origin, không dùng <code>*</code>.</p>
+  </div>
+
+  <div class="cheat-card full-width">
+    <h2>Bảng đối chiếu: Code tay (Bài 07–08) ↔ Express (Bài 09–10)</h2>
+    <table class="data">
+      <thead><tr><th>Bài toán</th><th>Node thuần</th><th>Express</th></tr></thead>
+      <tbody>
+        <tr><td>Định nghĩa route</td><td>Mảng <code>routes[]</code> + regex</td><td><code>app.get()/app.post()/...'</code></td></tr>
+        <tr><td>Path param</td><td>Regex <code>(\d+)</code> → <code>match[1]</code></td><td><code>:id</code> → <code>req.params.id</code></td></tr>
+        <tr><td>Query string</td><td><code>parseQuery(URLSearchParams)</code></td><td><code>req.query</code></td></tr>
+        <tr><td>Đọc body</td><td><code>readBody</code> gom chunk + JSON.parse</td><td><code>express.json()</code> → <code>req.body</code></td></tr>
+        <tr><td>Trả JSON</td><td><code>sendJson(res.writeHead + end)</code></td><td><code>res.json()</code></td></tr>
+        <tr><td>Cấu hình cổng</td><td><code>process.env.PORT</code></td><td><code>app.listen(PORT)</code></td></tr>
+      </tbody>
+    </table>
+    <p>💡 Express không "nhanh hơn" — nó gói các thứ bạn tự viết thành API chuẩn, có hệ sinh thái middleware.</p>
+  </div>
+
+</div>
+
+<p class="try-it" style="text-align:center; margin-top:20px;">
+📌 <a href="../lessons/index.html">🏠 Mục lục</a> ·
+<a href="../lessons/index.html">📚 Lộ trình</a> ·
+<a href="../GLOSSARY.md">📖 Glossary</a>
+</p>
+
+</div>
+<script src="../lessons/lesson-enhance.js"></script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 12 · Kết nối PostgreSQL (pg) — SQL thật, CRUD users</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 12</span>
+  <h1>Kết nối PostgreSQL (pg) — SQL thật, CRUD users</h1>
+  <p class="subtitle">Thay mảng <code>courses</code> trong bộ nhớ bằng database PostgreSQL thật: chạy Docker, kết nối bằng pg, viết SQL CRUD cho bảng users.</p>
+  <p class="meta-line">⏱ ~90 phút · 🎯 Mục tiêu: server e-learning có bảng <code>users</code> trong PostgreSQL, đọc/ghi bằng SQL thật qua thư viện pg, và API CRUD users chạy XANH bằng curl.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 10–11 bạn có server Express với routes, nhưng dữ liệu nằm trong mảng <code>courses</code> trong bộ nhớ — restart là mất. Bài 12 thay đúng chỗ đó bằng <strong>PostgreSQL</strong>: một chương trình riêng chạy trong Docker, lưu dữ liệu lên đĩa, và giao tiếp bằng <strong>SQL</strong> (ngôn ngữ hỏi database). Bạn sẽ thấy mọi thứ từ bài 02 (REST resource) giờ có database thật đằng sau.</p>
+  </div>
+
+  <h2>1. Vì sao cần database — và PostgreSQL là gì</h2>
+
+  <p>Cho tới giờ dữ liệu nằm trong mảng JavaScript trong bộ nhớ tiến trình. Điều này có 3 vấn đề:</p>
+
+  <table class="data">
+    <thead><tr><th>Vấn đề (mảng trong bộ nhớ)</th><th>Giải pháp (database)</th></tr></thead>
+    <tbody>
+      <tr><td>Restart server là mất hết dữ liệu</td><td>Database lưu trên đĩa, bền vững qua restart</td></tr>
+      <tr><td>Nhiều tiến trình server không dùng chung được</td><td>Database là nơi tập trung, mọi server cùng đọc/ghi</td></tr>
+      <tr><td>Không truy vấn được: "users nào đăng ký tháng này?", "khóa học giá > X"</td><td>SQL cho phép lọc, sắp xếp, gộp nhóm, join bảng</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/intro-whatis.html" target="_blank">PostgreSQL Official Docs</a>, PostgreSQL là <em>"a powerful, open source object-relational database system"</em> — hệ quản trị cơ sở dữ liệu quan hệ mã nguồn mở, dùng SQL chuẩn, có transactions, có index. Đây là database phổ biến được NestJS hỗ trợ tốt (TypeORM), đúng mission của bạn.</p>
+
+  <h2>2. Bật PostgreSQL bằng Docker</h2>
+
+  <p>Bạn đã có <code>docker-compose.yml</code> từ bài 00 khai báo container <code>elearning-postgres</code> (PostgreSQL 16-alpine, user/password/db đều <code>elearning</code>). Container đang tồn tại nhưng có thể đã tắt. Bật lên:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — từ thư mục elearning-backend/</span>
+<pre><code><span class="cmt"># Bật container PostgreSQL (lần đầu sẽ tạo từ image có sẵn)</span>
+<span class="tbl">docker</span> start elearning-postgres
+
+<span class="cmt"># Kiểm tra xem nó đã nhận kết nối chưa</span>
+<span class="tbl">docker</span> exec elearning-postgres pg_isready -U elearning -d elearning
+<span class="cmt"># /var/run/postgresql:5432 - accepting connections</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng Docker cho PostgreSQL?</div>
+    <p>Bạn không cần cài PostgreSQL native lên macOS. Docker cô lập môi trường: image chuẩn, cùng version với production, dữ liệu nằm trong volume <code>pgdata</code> (khai báo ở docker-compose) nên <strong>không mất khi tắt container</strong>. Clone repo là chạy được — đó là hạ tầng dạng mã (infrastructure-as-code).</p>
+  </div>
+
+  <p>Kiểm tra nhanh bằng lệnh SQL trong container:</p>
+  <div class="code-block">
+    <span class="code-label">Terminal — xem có bảng nào chưa</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">'\dt'</span>
+<span class="cmt"># Did not find any relations. — chưa có bảng nào, đúng như kỳ vọng</span></code></pre>
+  </div>
+
+  <h2>3. Thư viện pg (node-postgres)</h2>
+
+  <p><code>pg</code> là thư viện Node chính thức để nói chuyện với PostgreSQL — đã có sẵn trong <code>package.json</code> (<code>pg@^8.23.0</code> + <code>@types/pg</code>) nên không cần cài lại. Nếu dự án clone mới, chạy <code>npm install</code> ở thư mục <code>elearning-backend/</code> là đủ.</p>
+
+  <p>Theo <a href="https://node-postgres.com/features/connecting" target="_blank">node-postgres docs</a>, <code>pg</code> tự đọc các biến môi trường <code>PGHOST</code>, <code>PGPORT</code>, <code>PGUSER</code>, <code>PGPASSWORD</code>, <code>PGDATABASE</code>. Bạn đã biết cách dùng env ở bài 08 — giờ áp dụng cho database. Thêm vào <code>.env</code> (file đã bị ignore, không commit):</p>
+
+  <div class="code-block">
+    <span class="code-label">.env — thêm thông tin kết nối PostgreSQL</span>
+<pre><code><span class="cmt"># Server Express</span>
+PORT=4000
+
+<span class="cmt"># PostgreSQL (khớp với docker-compose.yml)</span>
+PGHOST=localhost
+PGPORT=5432
+PGUSER=elearning
+PGPASSWORD=elearning_dev_password
+PGDATABASE=elearning</code></pre>
+  </div>
+
+  <p>Để Node nạp file <code>.env</code> vào <code>process.env</code>, Node 24 có sẵn <code>process.loadEnvFile()</code> (không cần cài dotenv). Theo <a href="https://nodejs.org/docs/latest-v24.x/api/process.html#processloadenvfilepath" target="_blank">Node.js docs</a>, lệnh mặc định đọc <code>./.env</code>.</p>
+
+  <h2>4. Kết nối database bằng pool.query()</h2>
+
+  <p>Tạo file <code>src/db.ts</code> chuyên chứa kết nối:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/db.ts — kết nối PostgreSQL (File MỚI, cần tự tạo trong editor)</span>
+<pre><code><span class="cmt">// src/db.ts — nơi duy nhất quản lý kết nối database</span>
+<span class="kw">import</span> pg <span class="kw">from</span> <span class="str">'pg'</span>
+<span class="kw">import</span> { loadEnvFile } <span class="kw">from</span> <span class="str">'node:process'</span>
+
+<span class="fn">loadEnvFile</span>() <span class="cmt">// nạp .env vào process.env — Node 24 có sẵn</span>
+
+<span class="cmt">// Pool: "bể bơi" kết nối dùng chung — pg tự đọc PG* env vars</span>
+<span class="kw">export const</span> pool = <span class="kw">new</span> pg.<span class="fn">Pool</span>()
+
+<span class="cmt">// Kiểm tra kết nối thật — chạy server sẽ thấy dòng này nếu database OK</span>
+pool.<span class="fn">query</span>(<span class="str">'SELECT 1'</span>)
+  .<span class="fn">then</span>(() =&gt; console.<span class="fn">log</span>(<span class="str">'✅ Database connected'</span>))
+  .<span class="fn">catch</span>((err) =&gt; console.<span class="fn">error</span>(<span class="str">'❌ Database error:'</span>, err.message))</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng Pool?</div>
+    <p>Theo <a href="https://node-postgres.com/features/pooling" target="_blank">node-postgres docs</a>, mỗi truy vấn mở một kết nối TCP tốn chi phí. <code>Pool</code> giữ sẵn vài kết nối, dùng chung cho mọi <code>pool.query()</code> — đúng chuẩn production. Mỗi request Express dùng pool, không phải mở kết nối mới.</p>
+  </div>
+
+  <p>Lưu ý: <code>loadEnvFile()</code> chạy một lần ở module import — khi server khởi động. Đây là chi tiết quan trọng: <code>new pg.Pool()</code> đọc env ngay lúc tạo.</p>
+
+  <h2>5. Tạo bảng users bằng SQL thật</h2>
+
+  <p>SQL để tạo bảng — chạy trực tiếp trong container để hiểu bản chất (sau này sẽ học migrations):</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — SQL CREATE TABLE users</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL
+);"</span></code></pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Phần SQL</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>SERIAL PRIMARY KEY</code></td><td>Tự tăng id, là khóa chính (mỗi dòng duy nhất)</td></tr>
+      <tr><td><code>TEXT UNIQUE NOT NULL</code></td><td>Chuỗi, không trùng lặp, bắt buộc có</td></tr>
+      <tr><td><code>TEXT NOT NULL</code></td><td>Chuỗi bắt buộc có</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/sql-createtable.html" target="_blank">PostgreSQL docs CREATE TABLE</a>, <code>SERIAL</code> là kiểu tự tăng id và <code>PRIMARY KEY</code> định nghĩa khóa chính — nền tảng cho mọi bảng sau này.</p>
+
+  <h2>6. CRUD users qua Express + SQL thật</h2>
+
+  <p>Giờ nối Express với database: thay vì đọc/ghi mảng, các route dùng <code>pool.query()</code>. Thay toàn bộ <code>src/server.ts</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — Express + PostgreSQL CRUD users (THAY TOÀN BỘ)</span>
+<pre><code><span class="kw">import</span> express, { <span class="kw">type</span> Request, <span class="kw">type</span> Response } <span class="kw">from</span> <span class="str">'express'</span>
+<span class="kw">import</span> cors <span class="kw">from</span> <span class="str">'cors'</span>
+<span class="kw">import</span> { pool } <span class="kw">from</span> <span class="str">'./db.js'</span>
+
+<span class="kw">const</span> app = <span class="fn">express</span>()
+app.<span class="fn">use</span>(<span class="fn">cors</span>())
+app.<span class="fn">use</span>(<span class="fn">express.json</span>())
+
+<span class="cmt">// GET /api/users — đọc toàn bộ users từ database</span>
+app.<span class="fn">get</span>(<span class="str">'/api/users'</span>, <span class="kw">async</span> (req: Request, res: Response) =&gt; {
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(<span class="str">'SELECT id, email, name FROM users ORDER BY id'</span>)
+  res.<span class="fn">json</span>(rows)
+})
+
+<span class="cmt">// POST /api/users — tạo user mới, trả về dòng vừa tạo kèm id (SERIAL)</span>
+app.<span class="fn">post</span>(<span class="str">'/api/users'</span>, <span class="kw">async</span> (req: Request, res: Response) =&gt; {
+  <span class="kw">const</span> { email, name } = req.body ?? {}
+  <span class="kw">if</span> (!email || !name) {
+    res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'email và name là bắt buộc'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+    <span class="str">'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name'</span>,
+    [email, name],
+  )
+  res.<span class="fn">status</span>(<span class="num">201</span>).<span class="fn">json</span>(rows[<span class="num">0</span>])
+})
+
+<span class="cmt">// GET /api/users/:id — lấy 1 user</span>
+app.<span class="fn">get</span>(<span class="str">'/api/users/:id'</span>, <span class="kw">async</span> (req: Request, res: Response) =&gt; {
+  <span class="kw">const</span> id = <span class="fn">Number</span>(req.params.id) <span class="cmt">// ép kiểu id từ URL về số</span>
+  <span class="kw">if</span> (!<span class="fn">Number</span>.<span class="fn">isInteger</span>(id)) {
+    res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(<span class="str">'SELECT id, email, name FROM users WHERE id = $1'</span>, [id])
+  <span class="kw">if</span> (rows.<span class="fn">length</span> === <span class="num">0</span>) res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+  <span class="kw">else</span> res.<span class="fn">json</span>(rows[<span class="num">0</span>])
+})
+
+<span class="cmt">// PUT /api/users/:id — cập nhật name/email</span>
+app.<span class="fn">put</span>(<span class="str">'/api/users/:id'</span>, <span class="kw">async</span> (req: Request, res: Response) =&gt; {
+  <span class="kw">const</span> { email, name } = req.body ?? {}
+  <span class="kw">const</span> id = <span class="fn">Number</span>(req.params.id)
+  <span class="kw">if</span> (!<span class="fn">Number</span>.<span class="fn">isInteger</span>(id)) {
+    res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+    <span class="str">'UPDATE users SET email = $1, name = $2 WHERE id = $3 RETURNING id, email, name'</span>,
+    [email, name, id],
+  )
+  <span class="kw">if</span> (rows.<span class="fn">length</span> === <span class="num">0</span>) res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+  <span class="kw">else</span> res.<span class="fn">json</span>(rows[<span class="num">0</span>])
+})
+
+<span class="cmt">// DELETE /api/users/:id — xóa user</span>
+app.<span class="fn">delete</span>(<span class="str">'/api/users/:id'</span>, <span class="kw">async</span> (req: Request, res: Response) =&gt; {
+  <span class="kw">const</span> id = <span class="fn">Number</span>(req.params.id)
+  <span class="kw">if</span> (!<span class="fn">Number</span>.<span class="fn">isInteger</span>(id)) {
+    res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> { rowCount } = <span class="kw">await</span> pool.<span class="fn">query</span>(<span class="str">'DELETE FROM users WHERE id = $1'</span>, [id])
+  <span class="kw">if</span> (rowCount === <span class="num">0</span>) res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'User not found'</span> })
+  <span class="kw">else</span> res.<span class="fn">status</span>(<span class="num">204</span>).<span class="fn">end</span>()
+})
+
+<span class="kw">const</span> PORT = <span class="fn">Number</span>(process.env.PORT ?? <span class="num">4000</span>)
+app.<span class="fn">listen</span>(PORT, () =&gt; console.<span class="fn">log</span>(`✅ Express running at http://localhost:${PORT}`))</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng <code>$1, $2</code> thay vì nối chuỗi?</div>
+    <p>Đây là <strong>parameterized query</strong>: value được truyền riêng, database tự escape. Nếu nối <code>'... VALUES ('${email}')'</code> thì người dùng gửi <code>x'; DROP TABLE users;--</code> sẽ chạy được SQL của họ — đó là <strong>SQL injection</strong>, lỗ hổng kinh điển. <code>pg</code> nhận tham số qua mảng, xử lý an toàn. Đây là thói quen production bắt buộc.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Lỗi trang web thường gặp: email trùng</div>
+    <p>Vì cột <code>email</code> có <code>UNIQUE</code>, POST user trùng email sẽ ném lỗi 23505 từ database và server có thể trả 500. Bài này chấp nhận (mới học CRUD); bài 14 (auth) sẽ bắt lỗi này trả 409 và xử lý đúng cách. Cũng lưu ý: chưa có error-handling middleware ở code trên — nếu query lỗi, Express 5 trả HTML mặc định; bạn có thể giữ error-handler từ bài 11 bằng cách thêm lại.</p>
+  </div>
+
+  <h2>7. Chạy và verify bằng curl</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 1 — chạy server</span>
+<pre><code><span class="tbl">npm</span> run dev</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 2 — curl đủ 5 thao tác CRUD</span>
+<pre><code><span class="cmt"># 1. Tạo 2 users</span>
+<span class="fn">curl</span> -s -X POST -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"a@example.com","name":"An"}'</span> http://localhost:4000/api/users
+<span class="fn">curl</span> -s -X POST -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"b@example.com","name":"Binh"}'</span> http://localhost:4000/api/users
+
+<span class="cmt"># 2. Đọc tất cả users — phải thấy id 1, 2</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/users
+
+<span class="cmt"># 3. Đọc 1 user</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/users/1
+
+<span class="cmt"># 4. Cập nhật user 1</span>
+<span class="fn">curl</span> -s -X PUT -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"an.moi@example.com","name":"An Nguyen"}'</span> http://localhost:4000/api/users/1
+
+<span class="cmt"># 5. Xóa user 2</span>
+<span class="fn">curl</span> -s -o /dev/null -w <span class="str">"%{http_code}\n"</span> -X DELETE http://localhost:4000/api/users/2
+<span class="cmt"># 204</span>
+
+<span class="cmt"># 6. Xem dữ liệu trong database — phải thấy An cập nhật, Binh đã xóa</span>
+<span class="tbl">docker</span> exec elearning-postgres psql -U elearning -d elearning -c <span class="str">'SELECT * FROM users ORDER BY id;'</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (Node v24.16.0, Express 5.2.1, pg 8.23.0, PostgreSQL 16)</div>
+    <p>Đã chạy thật trên máy: typecheck exit 0; POST tạo 2 users trả 201 kèm id; GET list ra cả 2; GET :id đúng; PUT cập nhật email/name; DELETE :id trả 204; SELECT trong database cho thấy dữ liệu thật sự đã được lưu và xóa. Server restart KHÔNG mất dữ liệu — đúng lợi ích database.</p>
+  </div>
+
+  <h2>8. Tổng kết — bạn vừa đạt được</h2>
+
+  <ul class="checklist">
+    <li>Bật PostgreSQL bằng Docker, kiểm tra kết nối bằng pg_isready/psql</li>
+    <li>Kết nối database bằng <code>pg.Pool</code> + env vars (<code>loadEnvFile()</code> Node 24)</li>
+    <li>Tạo bảng <code>users</code> bằng SQL thật (SERIAL, PRIMARY KEY, UNIQUE, NOT NULL)</li>
+    <li>Viết CRUD users qua Express + <code>pool.query()</code> với parameterized query chống SQL injection</li>
+    <li>Dữ liệu bền vững: restart server không mất</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Trong code dùng <code>'INSERT INTO users (email, name) VALUES ($1, $2)'</code>. Vì sao dùng <code>$1, $2</code> thay vì nối chuỗi?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — chính là để chống SQL injection, không liên quan insertion order.">A. Vì database yêu cầu giá trị phải theo thứ tự bảng chữ cái</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Parameterized query: pg truyền giá trị riêng, database tự escape — chặn SQL injection (input '; DROP TABLE ...). Đây là thói quen bắt buộc.">B. Để database tự escape giá trị, chống SQL injection</button>
+    <button class="opt" data-correct="false" data-explain="Sai — $1,$2 là tham số an toàn, không phải cú pháp đẹp mắt.">C. Vì nó nhìn đẹp hơn</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Sau khi xóa user id=2, bạn restart server Express. Điều gì xảy ra với dữ liệu?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Dữ liệu nằm trong PostgreSQL (volume pgdata), không phải trong bộ nhớ Express — restart server không mất, restart container cũng không mất.">B. Dữ liệu vẫn còn — PostgreSQL lưu trên đĩa, không phải trong bộ nhớ Express</button>
+    <button class="opt" data-correct="false" data-explain="Sai — nếu dữ liệu mất thì database vô nghĩa; DB lưu đĩa bền vững.">A. Mất hết vì mảng courses là trong bộ nhớ</button>
+    <button class="opt" data-correct="false" data-explain="Sai — database lưu bền vững qua restart; volume pgdata giữ dữ liệu.">C. Mất hết vì dữ liệu nằm trong container tạm</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao dùng <code>pg.Pool</code> thay vì mở kết nối mới mỗi lần query?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — pg hoạt động bình thường với Pool; mục đích là tái sử dụng.">B. Pool giúp database chạy nhanh hơn bằng cách tăng CPU</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Mở kết nối TCP mới mỗi query tốn chi phí; Pool giữ sẵn vài kết nối dùng chung — chuẩn production.">A. Pool giữ sẵn các kết nối dùng chung, tránh mở kết nối mới mỗi lần — hiệu quả hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — SQL injection được chống bằng parameterized query, không phải Pool.">C. Pool tự chống SQL injection</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>9. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa tạo bảng <code>users</code> bằng tay qua psql và viết CRUD. Nhưng dự án e-learning cần nhiều bảng liên quan nhau: <code>users</code>, <code>courses</code>, <code>enrollments</code> (học viên đăng ký khóa), đơn hàng... Làm sao thiết kế bảng có quan hệ đúng (khóa ngoại, quan hệ 1-nhiều/nhiều-nhiều) để không trùng lặp dữ liệu? Bài 13 sẽ thiết kế database e-learning — ERD, bảng users/courses — trước khi xây dựng REST đầy đủ.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 13 · Thiết kế database e-learning — ERD, bảng users/courses</div>
+    <p class="nd">Thiết kế bảng có quan hệ (khóa ngoại, 1-nhiều, nhiều-nhiều) cho dự án e-learning thật — nền cho mọi API sau.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0011-middleware-nang-cao.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm theo bài: bật PostgreSQL, cài pg, tạo bảng users, thay server.ts thành CRUD users, chạy đủ 6 lệnh curl và gửi tôi output (kèm dòng SELECT cuối). Tôi sẽ kiểm tra bạn thấy dữ liệu thật sự lưu trong database, hiểu parameterized query chống SQL injection, và hiểu vì sao dữ liệu bền vững. Có gì chưa rõ về SQL/Pool, cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
