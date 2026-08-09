@@ -1,55 +1,115 @@
-import { createServer } from 'node:http' // lấy hàm tạo web server từ module http của Node
+import { createServer, IncomingMessage, ServerResponse } from 'node:http' // lấy hàm tạo web server từ module http của Node
 import { courses, createCourseId } from './courses.js'
 
+type RouteHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  match: RegExpMatchArray,
+  query: Record<string, string>,
+) => Promise<void> | void
+
+// Handler: GET /api/courses?limit=1 — trả danh sách (hỗ trợ limit)
+function listCourses(
+  req: IncomingMessage,
+  res: ServerResponse,
+  match: RegExpMatchArray,
+  query: Record<string, string>,
+): void {
+  const limit = Number(query.limit ?? courses.length)
+  sendJson(res, 200, courses.slice(0, limit))
+}
+
+// Handler: GET /api/courses/:id
+function getCourse(
+  req: IncomingMessage,
+  res: ServerResponse,
+  match: RegExpMatchArray,
+  query: Record<string, string>,
+): void {
+  const course = courses.find((c) => c.id === Number(match[1]))
+  if (course) sendJson(res, 200, course)
+  else sendJson(res, 404, { error: 'Course not found' })
+}
+
+// Handler: POST /api/courses — validation thiếu title -> 400
+async function createCourse(
+  req: IncomingMessage,
+  res: ServerResponse,
+  match: RegExpMatchArray,
+  query: Record<string, string>,
+): Promise<void> {
+  const data = await readBody(req)
+  if (!data.title || typeof data.title !== 'string') {
+    sendJson(res, 400, { error: 'title là bắt buộc (string)' })
+    return
+  }
+  const id = courses.length ? Math.max(...courses.map((c) => c.id)) + 1 : 1
+  const course = { id, title: data.title, price: data.price as number }
+  courses.push(course)
+  sendJson(res, 201, course)
+}
+
+// BẢNG ROUTE: { method, pattern (regex bắt path param), handler }
+const routes: { method: string; pattern: RegExp; handler: RouteHandler }[] = [
+  {
+    method: 'GET',
+    pattern: /^\/api\/courses$/,
+    handler: listCourses,
+  },
+  {
+    method: 'GET',
+    pattern: /^\/api\/courses\/(\d+)$/,
+    handler: getCourse,
+  },
+  {
+    method: 'POST',
+    pattern: /^\/api\/courses$/,
+    handler: createCourse,
+  },
+]
+
+// Parse query string thành object: 'limit=1&tag=node' -> { limit:'1', tag:'node' }
+const parseQuery = (queryString: string): Record<string, string> => {
+  const result: Record<string, string> = {}
+  for (const [key, value] of new URLSearchParams(queryString))
+    result[key] = value
+
+  return result
+}
+
+// Gom toàn bộ body từ stream Readable (req) — dừng khi hết chunk
+const readBody = async (
+  req: IncomingMessage,
+): Promise<Record<string, unknown>> => {
+  let body = ''
+  for await (const chunk of req) {
+    body += chunk
+  }
+  return body ? JSON.parse(body) : {}
+}
+
+// Trả JSON + status chuẩn
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify(data))
+}
+
 // Tạo server: mỗi khi có request tới, hàm này được gọi
-const server = createServer((req, res) => {
-  const url = new URL(req.url ?? '/', `http://${req.headers.host}`) // phân tích URL
-  const path = url.pathname // lấy đường dẫn (path) từ URL
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
+  const path = url.pathname
+  const query = parseQuery(url.search.slice(1))
 
-// POST /api/courses — tạo khóa học mới (thêm vào mảng, chưa có database)
-  if (req.method === 'POST' && path === '/api/courses') {
-    let body = '' // gom body từ stream — Node http không tự parse
-    req.on('data', (chunk) => { body += chunk })
-    req.on('end', () => {
-      const data = JSON.parse(body) // parse chuỗi JSON thành object
-      const newId = createCourseId() // tạo id mới cho khóa học
-      const course = { id: newId, title: data.title, price: data.price }
-      courses.push(course)
-
-      res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify(course))
-    })
-    return
-  }
-
-  // Routing: so khớp path với từng tài nguyên
-  if (req.method === 'GET' && path === '/api/courses') {
-    // Trả danh sách khóa học dạng JSON
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify(courses))
-    return
-  }
-
-  // Pattern /api/courses/:id — lấy id từ path bằng regex
-  const match = path.match(/^\/api\/courses\/(\d+)$/)
-  if (req.method === 'GET' && match) {
-    const id = Number(match[1]) // lấy id từ regex
-    const course = courses.find((c) => c.id === id) // tìm khóa học theo id
-    if (course) {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify(course))
-    } else {
-      // Không tìm thấy → 404 Not Found
-      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ error: 'Course not found' }))
+  for (const route of routes) {
+    if (req.method === route.method) {
+      const match = path.match(route.pattern)
+      if (match) {
+        await route.handler(req, res, match, query)
+        return
+      }
     }
-
-    return
   }
-
-  // Mọi request khác → 404
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
-  res.end(JSON.stringify({ error: 'Route not found' }))
+  sendJson(res, 404, { error: 'Route not found' })
 })
 
 const PORT = 4000 // cổng mặc định — đổi được khi cần

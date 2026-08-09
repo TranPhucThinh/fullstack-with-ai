@@ -33,3 +33,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **createServer(listener)** | Hàm node:http tạo server — listener là shorthand của EventEmitter `request`, chạy mỗi lần có request | 06 |
 | **res.end()** | Kết thúc response (bắt buộc gọi, đúng một lần) — quên gọi khiến client treo; gọi 2 lần lỗi write-after-end | 06 |
 | **res.write()** | Ghi thêm một phần body (gọi nhiều lần) — dùng cho stream dữ liệu lớn, khác res.end (kết thúc) | 06 |
+| **routing table (bảng route)** | Cấu trúc khai báo tập trung `{ method, pattern, handler }` để định tuyến thay vì if/else — tiền đề của router trong Express và controllers trong NestJS | 07 |
+| **URLSearchParams** | API web parse chuỗi query `?a=1&b=2` thành cặp key/value — nền tảng của `req.query` trong Express | 07 |
+| **validation (kiểm tra dữ liệu đầu vào)** | Bước kiểm tra dữ liệu request trước khi xử lý — thiếu title trả 400 thay vì tạo dữ liệu khuyết | 07 |
+| **status 400 Bad Request** | Mã lỗi client gửi request không hợp lệ — server từ chối xử lý, không tạo dữ liệu | 07 |
+| **status 404 Not Found** | Mã lỗi tài nguyên không tồn tại — trả về khi GET id không có trong dữ liệu | 07 |
+| **status 201 Created** | Mã thành công khi tạo mới resource — kèm body chứa object vừa tạo | 07 |
