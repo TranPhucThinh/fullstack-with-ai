@@ -69,3 +69,14 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **CORS (Cross-Origin Resource Sharing)** | Cơ chế cho phép trình duyệt gọi API từ domain khác qua header `Access-Control-Allow-Origin` — middleware `cors()` đặt đầu để header phủ mọi response | 11 |
 | **Access-Control-Allow-Origin** | Header do server trả để trình duyệt cho phép JS đọc response từ origin khác — `*` nghĩa là cho phép mọi origin (đủ cho dev, production cần giới hạn) | 11 |
 | **throw trong route handler** | Ném lỗi đồng bộ từ handler — Express 5 tự chuyển tới error-handling middleware; không có middleware này sẽ trả HTML lỗi mặc định | 11 |
+| **pg (node-postgres)** | Thư viện Node chính thức kết nối PostgreSQL — `new pg.Pool()` quản lý pool kết nối dùng chung, tự đọc PG* env vars | 12 |
+| **Pool (connection pool)** | "Bể bơi" kết nối database giữ sẵn và dùng chung — tránh mở kết nối TCP mới mỗi query, chuẩn production | 12 |
+| **loadEnvFile()** | API Node (từ v20.12/v21.7) nạp file `.env` vào process.env — thay thế dotenv trong dự án Node thuần | 12 |
+| **parameterized query** | Truy vấn SQL truyền giá trị qua tham số `$1, $2` thay vì nối chuỗi — database tự escape, chống SQL injection | 12 |
+| **SQL injection** | Lỗ hổng bảo mật khi input người dùng được nối thẳng vào SQL — attacker có thể chạy lệnh tùy ý (vd xóa bảng); phòng bằng parameterized query | 12 |
+| **SERIAL** | Kiểu cột PostgreSQL tự tăng id — mỗi dòng mới tự nhận số tiếp theo | 12 |
+| **PRIMARY KEY** | Khóa chính xác định duy nhất mỗi dòng trong bảng — không trùng, không NULL | 12 |
+| **UNIQUE constraint** | Ràng buộc cột không được trùng lặp — vd email mỗi user phải khác nhau | 12 |
+| **RETURNING** | Mệnh đề SQL trả về dòng vừa thêm/sửa — dùng để lấy id (SERIAL) và dữ liệu mới ngay sau INSERT/UPDATE | 12 |
+| **rowCount** | Số dòng bị ảnh hưởng bởi query (vd DELETE) — dùng để biết có xóa được hay không (0 = không tồn tại) | 12 |
+| **error 23505** | Mã lỗi PostgreSQL vi phạm UNIQUE constraint (vd email trùng) — ứng dụng cần bắt và trả 409/400 thay vì 500 | 12 |

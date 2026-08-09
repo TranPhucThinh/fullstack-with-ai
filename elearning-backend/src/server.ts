@@ -1,55 +1,75 @@
-import express, { NextFunction, type Request, type Response } from 'express'
-import { courses, createCourseId } from './courses.js'
 import cors from 'cors'
+import express, { type Request, type Response } from 'express'
+import { pool } from './db.js'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
-  next()
+// GET /api/users — đọc toàn bộ users từ database
+app.get('/api/users', async (req: Request, res: Response) => {
+  const { rows } = await pool.query(
+    'SELECT id, email, name FROM users ORDER BY id',
+  )
+  res.json(rows)
 })
 
-app.get('/api/courses', (req: Request, res: Response) => {
-  const limit = Number(req.query.limit ?? courses.length)
+// POST /api/users — tạo user mới, trả về dòng vừa tạo kèm id (SERIAL)
+app.post('/api/users', async (req: Request, res: Response) => {
+  const { email, name } = req.body ?? {}
 
-  res.json(courses.slice(0, limit))
-})
-
-app.get('/api/courses/:id', (req: Request, res: Response) => {
-  const course = courses.find((c) => c.id === Number(req.params.id))
-
-  if (course) res.json(course)
-  else res.status(404).json({ error: 'Course not found' })
-})
-
-app.post('/api/courses', (req: Request, res: Response) => {
-  const { title, price } = req.body ?? {}
-  if (!title || typeof title !== 'string') {
-    res.status(400).json({ error: 'title là bắt buộc (string)' })
+  if (!email || !name) {
+    res.status(400).json({ error: 'email và name là bắt buộc' })
     return
   }
+  const { rows } = await pool.query(
+    'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name',
+    [email, name],
+  )
+  res.status(201).json(rows[0])
+})
 
-  const id = createCourseId()
-  const course = {
-    id,
-    title,
-    price: Number(price),
+// GET /api/users/:id — lấy 1 user
+app.get('/api/users/:id', async (req: Request, res: Response) => {
+  const id = Number(req.params.id) // ép kiểu id từ URL về số
+  if (!Number.isInteger(id)) {
+    res.status(404).json({ error: 'User not found' })
+    return
   }
-
-  courses.push(course)
-
-  res.status(201).json(course)
+  const { rows } = await pool.query(
+    'SELECT id, email, name FROM users WHERE id = $1',
+    [id],
+  )
+  if (rows.length === 0) res.status(404).json({ error: 'User not found' })
+  else res.json(rows[0])
 })
 
-app.get('/api/boom', () => {
-  throw new Error('Có lỗi xảy ra!')
+// PUT /api/users/:id — cập nhật name/email
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  const { email, name } = req.body ?? {}
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id)) {
+    res.status(404).json({ error: 'User not found' })
+    return
+  }
+  const { rows } = await pool.query(
+    'UPDATE users SET email = $1, name = $2 WHERE id = $3 RETURNING id, email, name',
+    [email, name, id],
+  )
+  if (rows.length === 0) res.status(404).json({ error: 'User not found' })
+  else res.json(rows[0])
 })
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error('Lỗi:', err.message)
-  res.status(500).json({ error: 'Internal Server Error' })
+// DELETE /api/users/:id — xóa user
+app.delete('/api/users/:id', async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id)) {
+    res.status(404).json({ error: 'User not found' })
+    return
+  }
+  const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [id])
+  if (rowCount === 0) res.status(404).json({ error: 'User not found' })
+  else res.status(204).end()
 })
 
 const PORT = Number(process.env.PORT ?? 4000)
