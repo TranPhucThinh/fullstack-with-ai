@@ -28,3 +28,8 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **devDependencies** | Gói chỉ cần khi phát triển (typescript, @types/node) — không cần trên server production | 05 |
 | **dependencies** | Gói cần để chạy ở production (vd tsx) | 05 |
 |**ESM local import đuôi .js** | Trong Node ESM, import file local phải ghi đủ đuôi `.js` (tương ứng `.ts` sau khi biên dịch) — khác bundler, hay gây lỗi khi chuyển ngữ cảnh | 05 |
+| **IncomingMessage (req)** | Đối tượng đại diện request trong node:http — extends stream.Readable, chứa method, url, headers; body đọc theo chunk qua sự kiện data/end | 06 |
+| **ServerResponse (res)** | Đối tượng đại diện response trong node:http — extends OutgoingMessage (stream ghi), dùng statusCode/setHeader/writeHead/write/end | 06 |
+| **createServer(listener)** | Hàm node:http tạo server — listener là shorthand của EventEmitter `request`, chạy mỗi lần có request | 06 |
+| **res.end()** | Kết thúc response (bắt buộc gọi, đúng một lần) — quên gọi khiến client treo; gọi 2 lần lỗi write-after-end | 06 |
+| **res.write()** | Ghi thêm một phần body (gọi nhiều lần) — dùng cho stream dữ liệu lớn, khác res.end (kết thúc) | 06 |

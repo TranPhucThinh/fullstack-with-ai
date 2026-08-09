@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 06 · HTTP server bằng Node thuần (http module)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 1 · Bài 06</span>
+  <h1>HTTP server bằng Node thuần (http module)</h1>
+  <p class="subtitle">Mổ xẻ node:http — hiểu req/res là đối tượng gì, vì sao createServer nhận 2 tham số, và các cách trả response.</p>
+  <p class="meta-line">⏱ ~50 phút · 🎯 Mục tiêu: giải thích được IncomingMessage vs ServerResponse, phân biệt res.write/res.end, và viết demo inspect request thật.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Từ bài 02 bạn đã viết <code>createServer((req, res) => ...)</code> và dùng <code>req.on('data')</code>, <code>res.writeHead</code>, <code>res.end</code>. Nhưng <code>req</code> và <code>res</code> thực chất là gì? Vì sao <code>req.on('data')</code> hoạt động như stream? Bài này mổ xẻ <code>node:http</code> — tầng thấp nhất mà Express và NestJS đều nằm trên.</p>
+  </div>
+
+  <h2>1. node:http — module nền tảng của mọi web server</h2>
+  <p><code>node:http</code> là module có sẵn trong Node (không cần cài npm). Theo <a href="https://nodejs.org/api/http.html" target="_blank">Node.js docs — HTTP</a>, nó cung cấp <code>http.createServer([options][, requestListener])</code> — hàm tạo ra một <code>http.Server</code>.</p>
+
+  <div class="code-block">
+    <span class="code-label">Cú pháp createServer — tách bạch hai cách dùng</span>
+<pre><code><span class="kw">import</span> http <span class="kw">from</span> <span class="str">'node:http'</span>
+
+<span class="cmt">// Cách 1 (viết gọn, bạn đang dùng): truyền thẳng requestListener</span>
+<span class="kw">const</span> server1 = http.<span class="fn">createServer</span>((req, res) => {
+  <span class="fn">res</span>.<span class="fn">end</span>(<span class="str">'Hello'</span>)
+})
+
+<span class="cmt">// Cách 2: server là EventEmitter — tự đăng ký sự kiện 'request'</span>
+<span class="kw">const</span> server2 = http.<span class="fn">createServer</span>()
+server2.<span class="fn">on</span>(<span class="str">'request'</span>, (req, res) => {
+  <span class="fn">res</span>.<span class="fn">end</span>(<span class="str">'Hello'</span>)
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao hay nhầm "2 cách"?</div>
+    <p>Theo <a href="https://nodejs.org/en/learn/http/anatomy-of-an-http-transaction" target="_blank">Node.js Learn — Anatomy of an HTTP Transaction</a>, cái hàm truyền vào <code>createServer</code> được gọi <strong>mỗi lần có request</strong> và nó chính là <strong>request handler</strong>. Thực ra <code>http.Server</code> là một <strong>EventEmitter</strong>: cách 1 chỉ là shorthand của cách 2 (tự thêm listener cho sự kiện <code>'request'</code>). Hiểu điều này giúp bạn nhớ vì sao server hoạt động event-based — liên quan thẳng tới event loop bài 04.</p>
+  </div>
+
+  <h2>2. req — đối tượng IncomingMessage (stream đọc)</h2>
+  <p>Theo <a href="https://nodejs.org/api/http.html#class-http-incomingmessage" target="_blank">Node.js docs — IncomingMessage</a>, <code>req</code> là một thể hiện của <code>http.IncomingMessage</code>, được tạo nội bộ bởi <code>http.Server</code> và truyền làm tham số đầu tiên. Quan trọng: <strong>nó extends <code>stream.Readable</code></strong> — tức req là một <em>stream đọc</em>, đọc dữ liệu đến theo từng chunk qua sự kiện <code>'data'</code>/<code>'end'</code>. Đây chính là lý do bài 03 phải gom body bằng <code>req.on('data')</code>.</p>
+
+  <table class="data">
+    <thead><tr><th>Thuộc tính/phương thức</th><th>Ý nghĩa</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><code>req.method</code></td><td>HTTP method của request</td><td><code>'GET'</code>, <code>'POST'</code>, <code>'DELETE'</code></td></tr>
+      <tr><td><code>req.url</code></td><td>Đường dẫn + query string (chưa phân rã)</td><td><code>'/api/courses?id=1'</code></td></tr>
+      <tr><td><code>req.headers</code></td><td>Object chứa toàn bộ header (thường lowercase)</td><td><code>{ host: 'localhost:4000', 'content-type': 'application/json' }</code></td></tr>
+      <tr><td><code>req.on('data'/'end')</code></td><td>Stream Readable — đọc body theo chunk</td><td>Gom body POST</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. res — đối tượng ServerResponse (stream ghi)</h2>
+  <p>Theo <a href="https://nodejs.org/api/http.html#class-http-serverresponse" target="_blank">Node.js docs — ServerResponse</a>, <code>res</code> là thể hiện của <code>http.ServerResponse</code>, được tạo nội bộ bởi HTTP server và truyền làm <strong>tham số thứ hai</strong>. Nó extends <code>http.OutgoingMessage</code> (một <em>stream ghi</em> writable) — bạn ghi dữ liệu vào nó và Node gửi đi qua socket.</p>
+
+  <table class="data">
+    <thead><tr><th>Cách ghi</th><th>Ý nghĩa</th><th>Khi nào dùng</th></tr></thead>
+    <tbody>
+      <tr><td><code>res.statusCode = 200</code></td><td>Gán mã trạng thái</td><td>Trước khi gửi header</td></tr>
+      <tr><td><code>res.setHeader(name, value)</code></td><td>Gán một header</td><td>Gán <code>Content-Type</code>, <code>Cache-Control</code>...</td></tr>
+      <tr><td><code>res.writeHead(code, headers)</code></td><td>Gán status + nhiều header trong một lần</td><td>Viết gọn, hay dùng trong API</td></tr>
+      <tr><td><code>res.write(chunk)</code></td><td>Ghi thêm một phần body (gọi nhiều lần được)</td><td>Stream dữ liệu lớn</td></tr>
+      <tr><td><code>res.end(data?)</code></td><td><strong>Kết thúc response</strong>, có thể kèm mẩu body cuối</td><td><strong>Luôn luôn phải gọi</strong> để kết thúc</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <div class="ct">⚠️ Quên res.end() — request treo vô hạn</div>
+    <p>Nếu bạn ghi body nhưng <strong>không gọi <code>res.end()</code></strong>, Node sẽ không kết thúc response — client chờ mãi tới khi timeout. Đây là lỗi rất phổ biến của dev mới viết Node thuần. Luôn nhớ: <code>res.end()</code> là dấu chấm hết của response; nếu bạn gọi <code>res.end()</code> hai lần sẽ bị lỗi "write after end".</p>
+  </div>
+
+  <h2>4. Thực hành — demo inspect request trên máy thật</h2>
+  <p>Tạo 2 file trong thư mục <code>demo/</code> (đã có từ bài 04-05). Đây là minh hoạ trực quan về request/response mà <code>createServer</code> đưa vào handler.</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/inspect-http.mjs</span>
+<pre><code><span class="cmt">// File: demo/inspect-http.mjs</span>
+<span class="cmt">// Mổ xẻ req: in ra method, url, headers rồi trả response</span>
+<span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+
+<span class="cmt">// Mỗi request tới → Node gọi handler này với (req, res)</span>
+<span class="kw">const</span> server = createServer(<span class="fn">(req, res)</span> => {
+  <span class="fn">console</span>.log(<span class="str">'=== REQUEST VỪA NHẬN ==='</span>)
+  <span class="fn">console</span>.log(<span class="str">'method :'</span>, req.method)        <span class="cmt">// GET/POST/...</span>
+  <span class="fn">console</span>.log(<span class="str">'url    :'</span>, req.url)           <span class="cmt">// path + query, chưa phân rã</span>
+  <span class="fn">console</span>.log(<span class="str">'headers:'</span>, req.headers)     <span class="cmt">// object chứa mọi header</span>
+  <span class="fn">console</span>.log(<span class="str">'host   :'</span>, req.headers.host)
+
+  <span class="cmt">// Trả response đơn giản — statusCode + header + end</span>
+  res.statusCode = <span class="num">200</span>
+  res.setHeader(<span class="str">'Content-Type'</span>, <span class="str">'text/plain; charset=utf-8'</span>)
+  res.<span class="fn">end</span>(<span class="str">'Xin chào từ http module!'</span>)
+})
+
+server.<span class="fn">listen</span>(<span class="num">4010</span>, () => {
+  <span class="fn">console</span>.log(<span class="str">'✅ Server chạy tại http://localhost:4010'</span>)
+})</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">demo/response-options.mjs — phân biệt write vs end</span>
+<pre><code><span class="cmt">// File: demo/response-options.mjs</span>
+<span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+
+<span class="kw">const</span> server = createServer(<span class="fn">(req, res)</span> => {
+  <span class="cmt">// Cách tách bạch: gán status + header riêng</span>
+  res.statusCode = <span class="num">404</span>
+  res.setHeader(<span class="str">'Content-Type'</span>, <span class="str">'text/plain; charset=utf-8'</span>)
+
+  res.<span class="fn">write</span>(<span class="str">'Phần 1 của body\n'</span>)   <span class="cmt">// write: ghi thêm — gọi nhiều lần được</span>
+  res.<span class="fn">write</span>(<span class="str">'Phần 2 của body\n'</span>)
+  res.<span class="fn">end</span>(<span class="str">'Xong!'</span>)                  <span class="cmt">// end: KẾT THÚC response, kèm mẩu cuối</span>
+})
+server.<span class="fn">listen</span>(<span class="num">4011</span>, () => <span class="fn">console</span>.log(<span class="str">'✅ http://localhost:4011'</span>))</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo và quan sát</span>
+<pre><code><span class="cmt"># Từ thư mục elearning-backend/</span>
+<span class="fn">cd</span> demo
+<span class="fn">node</span> inspect-http.mjs          <span class="cmt"># mở terminal riêng để chạy server</span>
+<span class="fn">node</span> response-options.mjs     <span class="cmt"># demo thứ 2 — dùng cổng 4011</span>
+
+<span class="cmt"># Ở terminal khác, gửi request:</span>
+<span class="fn">curl</span> <span class="str">'http://localhost:4010/hello?x=1'</span>
+<span class="cmt"># Server in ra: method=GET, url=/hello?x=1, headers=..., host=localhost:4010</span>
+
+<span class="fn">curl</span> -i <span class="str">http://localhost:4011/</span>
+<span class="cmt"># → HTTP/1.1 404 Not Found, body: Phần 1 + Phần 2 + Xong!</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng trên Node v24</div>
+    <p>Đã chạy thật: <code>inspect-http.mjs</code> in ra đúng method/url/headers khi curl; <code>response-options.mjs</code> trả HTTP 404 + 3 phần body (write, write, end). Với máy bạn (Node v24.16.0) kết quả giống hệt.</p>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Trong <code>createServer((req, res) => ...)</code>, <code>req</code> chính xác là đối tượng gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — req không phải socket; nó là IncomingMessage, tách rời socket để xử lý keep-alive (socket có thể tái sử dụng).">A. Socket TCP gốc của kết nối</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! req là http.IncomingMessage, extends stream.Readable — đọc method, url, headers và body theo từng chunk qua sự kiện data/end.">B. http.IncomingMessage — stream đọc</button>
+    <button class="opt" data-correct="false" data-explain="Sai — requestListener là hàm bạn truyền vào createServer, không phải đối tượng nằm trong handler.">C. Một object requestListener</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Điều nào SAI về res.end()?</div>
+    <button class="opt" data-correct="false" data-explain="Đúng — res.end(data) viết mẩu cuối VÀ kết thúc response, đúng mô tả.">A. res.end(data) ghi thêm mẩu cuối và kết thúc response</button>
+    <button class="opt" data-correct="false" data-explain="Đúng — quên res.end() khiến response không bao giờ kết thúc, client chờ mãi.">B. Quên res.end() khiến request treo vô hạn</button>
+    <button class="opt" data-correct="true" data-explain="ĐÂY LÀ CÂU SAI. res.end() phải gọi ĐÚNG MỘT LẦN — gọi thêm lần nữa sẽ lỗi 'write after end'.">C. Gọi res.end() nhiều lần là an toàn</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Server nhận request <code>GET /api/courses?id=1</code>. Giá trị của <code>req.url</code> là gì?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! req.url là chuỗi path + query CHƯA phân rã (kiểu 'chưa xử lý'), bạn phải tự parse bằng URL/web streams.">A. <code>'/api/courses?id=1'</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — req.url giữ cả query string; path chỉ là một phần của url.">B. <code>'/api/courses'</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — node:http không tự biến req.url thành đối tượng; cần new URL(req.url, base) mới phân rã được.">C. <code>{ path: '/api/courses', query: 'id=1' }</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu createServer là shorthand của EventEmitter 'request' (anotomy of HTTP transaction)</li>
+      <li>Biết req = IncomingMessage (stream Readable) — method, url, headers, body theo chunk</li>
+      <li>Biết res = ServerResponse (stream ghi) — statusCode, setHeader, writeHead, write, end</li>
+      <li>✅ Thêm 2 demo inspect-http.mjs + response-options.mjs vào dự án, chạy và quan sát request thật</li>
+    </ul>
+  </div>
+
+  <h2>5. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa thấy <code>req.url</code> chỉ là chuỗi <em>chưa phân rã</em> (path + query lẫn nhau), và trong bài 02-03 bạn phải tự dùng <code>new URL(req.url)</code> + regex để tách path, gom body bằng stream. Vậy <strong>routing (chia request theo path/method), parse query, gom body</strong> — viết tay hết sẽ như thế nào khi dự án có 10 API? Đó chính là bài 07: <strong>Xử lý request/response thủ công</strong>.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 07 · Xử lý request/response thủ công — routing, body, query</div>
+    <p class="nd">Xây một bộ routing thủ công có cấu trúc: bảng route, parse query, gom body, trả JSON — nền để hiểu Express sinh ra để làm gì.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0005-module-system.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Chạy 2 file demo rồi gửi tôi output của curl 4010 và 4011 — tôi sẽ kiểm tra bạn đã thấy được req.method/req.url/headers thật và thứ tự body write→end. Có gì chưa rõ về IncomingMessage hay ServerResponse, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
