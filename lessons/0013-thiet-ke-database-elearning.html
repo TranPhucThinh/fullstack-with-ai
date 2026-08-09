@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 13 · Thiết kế database e-learning — ERD, bảng users/courses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 13</span>
+  <h1>Thiết kế database e-learning — ERD, bảng users/courses</h1>
+  <p class="subtitle">Thiết kế bảng có quan hệ đúng (khóa ngoại, 1-nhiều, nhiều-nhiều) cho e-learning — từ vấn đề thực tế tới ERD rồi SQL thật.</p>
+  <p class="meta-line">⏱ ~90 phút · 🎯 Mục tiêu: vẽ được ERD e-learning (users, courses, enrollments), hiểu quan hệ & khóa ngoại, tạo bảng + JOIN thật trong PostgreSQL.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 12 bạn đã có bảng <code>users</code> đơn lẻ và CRUD. Nhưng e-learning thật không chỉ có users — còn courses (khóa học) và enrollments (ai đăng ký khóa nào). Bài này giải bài toán: <strong>thiết kế các bảng liên quan nhau như thế nào</strong> để không trùng lặp, không sai lệch dữ liệu, và truy vấn được "user nào học khóa nào".</p>
+  </div>
+
+  <h2>1. Vấn đề khi lưu mọi thứ trong 1 bảng</h2>
+
+  <p>Giả sử chỉ có một bảng lưu mọi thứ — học viên + khóa học họ đăng ký:</p>
+
+  <table class="data">
+    <thead><tr><th>user_id</th><th>user_name</th><th>user_email</th><th>course_title</th><th>course_price</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>An</td><td>a@ex.com</td><td>NestJS cơ bản</td><td>500000</td></tr>
+      <tr><td>1</td><td>An</td><td>a@ex.com</td><td>Design Pattern</td><td>800000</td></tr>
+      <tr><td>2</td><td>Binh</td><td>b@ex.com</td><td>NestJS cơ bản</td><td>500000</td></tr>
+      <tr><td>2</td><td>Binh</td><td>b@ex.com</td><td>SQL Master</td><td>700000</td></tr>
+    </tbody>
+  </table>
+
+  <p>Các vấn đề (gọi là <strong>redundancy / update anomaly</strong>):</p>
+  <ul>
+    <li><strong>Trùng lặp:</strong> "An" xuất hiện 2 lần, "NestJS cơ bản" xuất hiện 2 lần — tốn dung lượng, dễ sai khi sửa.</li>
+    <li><strong>Cập nhật không nhất quán:</strong> đổi giá khóa học 500000 phải sửa nhiều dòng, lỡ quên 1 dòng là data sai.</li>
+    <li><strong>Khó mở rộng:</strong> muốn thêm trường "khóa học có bao nhiêu bài giảng" phải đụng bảng users.</li>
+  </ul>
+
+  <div class="callout why">
+    <div class="ct">💡 Giải pháp: tách bảng (normalization)</div>
+    <p>Thay vì một bảng khổng lồ, ta tách thành <strong>users</strong> (thông tin người) và <strong>courses</strong> (thông tin khóa) — mỗi thứ lưu một lần — rồi dùng bảng trung gian nối quan hệ. Đây là ý tưởng cốt lõi của <strong>database normalization</strong>: mỗi dữ liệu lưu đúng một nơi, tránh trùng lặp và dị thường.</p>
+  </div>
+
+  <h2>2. Ba kiểu quan hệ</h2>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/tutorial-join.html" target="_blank">PostgreSQL docs</a> và lý thuyết quan hệ, có 3 kiểu quan hệ chính giữa bảng:</p>
+
+  <table class="data">
+    <thead><tr><th>Quan hệ</th><th>Ý nghĩa</th><th>Ví dụ e-learning</th><th>Biểu diễn</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1–1</strong> (one-to-one)</td><td>1 dòng bảng A khớp đúng 1 dòng bảng B</td><td>user ↔ profile chi tiết</td><td>Khóa ngoại + UNIQUE</td></tr>
+      <tr><td><strong>1–nhiều</strong> (one-to-many)</td><td>1 dòng bảng A có nhiều dòng bảng B</td><td>1 course có nhiều lessons</td><td>Khóa ngoại ở bảng "nhiều"</td></tr>
+      <tr><td><strong>nhiều–nhiều</strong> (many-to-many)</td><td>Nhiều dòng A ↔ nhiều dòng B</td><td>user học nhiều courses, course có nhiều users</td><td>Bảng trung gian (junction)</td></tr>
+    </tbody>
+  </table>
+
+  <p>Trong e-learning, quan hệ quan trọng nhất là <strong>user ↔ course là nhiều-nhiều</strong>: một user có thể mua nhiều khóa, một khóa có thể có nhiều học viên. Nhiều-nhiều không biểu diễn trực tiếp được bằng khóa ngoại đơn — cần <strong>bảng trung gian enrollments</strong>.</p>
+
+  <h2>3. Khóa ngoại (FOREIGN KEY) — dây nối giữa bảng</h2>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK" target="_blank">PostgreSQL docs</a>, khóa ngoại là constraint đảm bảo <em>"the values in a column must match the values appearing in some row of another table"</em> — cột trong bảng này phải tồn tại trong bảng kia. Nó chính là thứ <strong>ép database giữ đúng quan hệ</strong>, không cho insert dữ liệu lỏng lẻo.</p>
+
+  <div class="code-block">
+    <span class="code-label">Cú pháp khóa ngoại</span>
+<pre><code><span class="kw">CREATE TABLE</span> enrollments (
+  id <span class="tbl">SERIAL PRIMARY KEY</span>,
+  user_id <span class="tbl">INTEGER NOT NULL REFERENCES users(id)</span>,
+  course_id <span class="tbl">INTEGER NOT NULL REFERENCES courses(id)</span>,
+  enrolled_at <span class="tbl">TIMESTAMPTZ NOT NULL DEFAULT now()</span>
+);</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao khóa ngoại quan trọng?</div>
+    <p>Nếu không có <code>REFERENCES</code>, bạn có thể insert enrollment với <code>user_id=999</code> (không tồn tại) — data rác. Khóa ngoại khiến database <strong>tự chặn</strong>: lỗi ngay khi cố vi phạm. Đây là tầng bảo vệ cuối cùng, không phụ thuộc code ứng dụng.</p>
+  </div>
+
+  <h2>4. ERD cho e-learning</h2>
+
+  <p><strong>ERD (Entity-Relationship Diagram)</strong> là bản vẽ các bảng và quan hệ — đọc trước khi viết SQL để hình dung rõ. ERD tối giản cho e-learning:</p>
+
+  <div class="callout tip">
+    <div class="ct">🗺️ ERD — users ↔ courses qua enrollments (nhiều-nhiều)</div>
+    <pre>
+users 1 ──── * enrollments * ──── 1 courses
+  id  │              │              │  id
+  email                │              │  title
+  name                 │              │  price
+                       │
+                       └── user_id, course_id, enrolled_at
+    </pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Bảng</th><th>Vai trò</th><th>Cột chính</th></tr></thead>
+    <tbody>
+      <tr><td><code>users</code></td><td>Người dùng (học viên/giảng viên/admin)</td><td>id, email (UNIQUE), name, role</td></tr>
+      <tr><td><code>courses</code></td><td>Khóa học</td><td>id, title, price, description</td></tr>
+      <tr><td><code>enrollments</code></td><td>Bảng trung gian: user đăng ký course</td><td>id, user_id FK, course_id FK, enrolled_at</td></tr>
+    </tbody>
+  </table>
+
+  <p>Ký hiệu <code>1 ──── *</code> nghĩa là "một users có nhiều enrollments" và <code>* ──── 1</code> nghĩa là "nhiều enrollments thuộc một course". enrollments là <strong>junction table</strong> phá vỡ quan hệ nhiều-nhiều thành hai quan hệ 1-nhiều.</p>
+
+  <h2>5. Tạo bảng thật trong PostgreSQL</h2>
+
+  <p>Bảng <code>users</code> đã có từ bài 12. Giờ thêm <code>courses</code> và <code>enrollments</code> bằng SQL thật:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — SQL tạo bảng courses + enrollments</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE TABLE courses (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  price INTEGER NOT NULL DEFAULT 0 CHECK (price &gt;= 0),
+  description TEXT
+);"</span>
+
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE TABLE enrollments (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  course_id INTEGER NOT NULL REFERENCES courses(id),
+  enrolled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, course_id)
+);"</span></code></pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Constraint</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>CHECK (price &gt;= 0)</code></td><td>Giá không âm — database tự chặn</td></tr>
+      <tr><td><code>REFERENCES users(id)</code></td><td>user_id phải tồn tại trong users</td></tr>
+      <tr><td><code>UNIQUE (user_id, course_id)</code></td><td>Một user chỉ đăng ký một khóa 1 lần — chống trùng enrollment</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS" target="_blank">PostgreSQL docs</a>, <code>CHECK</code> giới hạn giá trị cột (vd giá không âm); <code>UNIQUE (a, b)</code> là unique trên tổ hợp cột — rất hữu ích cho bảng trung gian.</p>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Trước khi chạy: users phải có sẵn</div>
+    <p>Vì <code>enrollments.user_id</code> tham chiếu tới <code>users(id)</code>, bạn phải có bảng users (đã tạo bài 12) và có dữ liệu users trước khi insert enrollment. Nếu bảng users chưa có, chạy lại lệnh CREATE TABLE users ở bài 12.</p>
+  </div>
+
+  <h2>6. INSERT dữ liệu quan hệ</h2>
+
+  <p>Chèn dữ liệu thật để thấy quan hệ hoạt động:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chèn courses + enrollments</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"INSERT INTO courses (title, price) VALUES ('NestJS cơ bản', 500000), ('Design Pattern', 800000);"</span>
+
+<span class="cmt"># Giả sử user id=1 (An) đăng ký khóa 1, user id=2 đăng ký khóa 1 và 2</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"INSERT INTO enrollments (user_id, course_id) VALUES (1, 1), (2, 1), (2, 2);"</span></code></pre>
+  </div>
+
+  <p>Thử vi phạm khóa ngoại để thấy database chặn:</p>
+  <div class="code-block">
+    <span class="code-label">Terminal — vi phạm khóa ngoại</span>
+<pre><code><span class="cmt"># user_id=999 không tồn tại -> database từ chối (lỗi foreign key)</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"INSERT INTO enrollments (user_id, course_id) VALUES (999, 1);"</span>
+<span class="cmt"># ERROR: insert or update on table "enrollments" violates foreign key constraint</span></code></pre>
+  </div>
+
+  <h2>7. JOIN — gộp bảng để trả câu hỏi nghiệp vụ</h2>
+
+  <p>Dữ liệu nằm rải ở 3 bảng. <strong>JOIN</strong> là cách gộp chúng lại theo quan hệ. Câu hỏi: <em>"An đang học những khóa nào?"</em> — cần nối users → enrollments → courses:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — JOIN 3 bảng</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"SELECT users.name, courses.title
+FROM users
+JOIN enrollments ON enrollments.user_id = users.id
+JOIN courses ON courses.id = enrollments.course_id
+WHERE users.id = 1;"</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Cách đọc JOIN</div>
+    <p><code>FROM users</code> → đi từ bảng người. <code>JOIN enrollments ON enrollments.user_id = users.id</code> → nối với enrollments nơi khóa ngoại khớp. <code>JOIN courses ON ...</code> → nối tiếp. Kết quả là danh sách các cặp (user, course) qua enrollments — đúng nghiệp vụ "user đăng ký khóa nào".</p>
+  </div>
+
+  <h2>8. Tổng kết — bạn vừa đạt được</h2>
+
+  <ul class="checklist">
+    <li>Nhận ra vấn đề trùng lặp/dị thường khi lưu một bảng</li>
+    <li>Phân biệt 3 quan hệ: 1-1, 1-nhiều, nhiều-nhiều</li>
+    <li>Hiểu khóa ngoại (REFERENCES) — database tự chặn dữ liệu lỏng lẻo</li>
+    <li>Vẽ ERD e-learning: users ↔ enrollments ↔ courses</li>
+    <li>Tạo bảng thật (CHECK, UNIQUE tổ hợp) và truy vấn bằng JOIN</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Quan hệ giữa user và course trong e-learning là gì?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Một user mua nhiều khóa, một khóa có nhiều học viên — nhiều-nhiều, cần bảng trung gian enrollments.">A. Nhiều-nhiều, cần bảng trung gian enrollments</button>
+    <button class="opt" data-correct="false" data-explain="Sai — 1-nhiều là 1 bảng A có nhiều bảng B, ở đây cả hai phía đều nhiều.">B. 1-nhiều (course có nhiều users)</button>
+    <button class="opt" data-correct="false" data-explain="Sai — 1-1 là 1-1 khớp đúng, không đúng với khóa học.">C. 1-1 (mỗi user một khóa)</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Vì sao thêm <code>REFERENCES users(id)</code> vào cột user_id của enrollments?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — khóa ngoại không tự tạo bảng, chỉ ràng buộc giá trị.">B. Để tự tạo bảng users</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Khóa ngoại ép giá trị user_id phải tồn tại trong users(id) — database từ chối insert dữ liệu lỏng lẻo, bảo vệ toàn vẹn dữ liệu.">A. Ép user_id phải tồn tại trong users(id) — chặn insert user_id rác</button>
+    <button class="opt" data-correct="false" data-explain="Sai — khóa ngoại không làm user_id tự tăng; SERIAL mới tự tăng.">C. Để user_id tự tăng</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Bảng enrollments có <code>UNIQUE (user_id, course_id)</code>. Ý nghĩa?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — đây là unique trên TỔ HỢP 2 cột, không phải từng cột độc lập.">B. user_id và course_id mỗi cái phải unique riêng</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Cùng một cặp (user, course) chỉ xuất hiện 1 lần — chống đăng ký trùng, trong khi user vẫn có thể có nhiều khóa khác nhau.">A. Một user chỉ đăng ký một khóa 1 lần (chống trùng cặp)</button>
+    <button class="opt" data-correct="false" data-explain="Sai — unique tổ hợp vẫn cho phép user 1 học nhiều course khác nhau.">C. Mỗi user chỉ được đăng ký đúng 1 khóa</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>9. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã có database với users/courses/enrollments và JOIN để trả lời "user học khóa nào". Nhưng hệ thống đăng ký thật cần <strong>xác thực người dùng</strong>: ai được phép tạo khóa, ai mua khóa, mật khẩu lưu sao cho an toàn. Bài 14 sẽ làm auth cơ bản bằng Express — bcrypt để hash mật khẩu, JWT để tạo token — và bắt lỗi email trùng (409) mà bài 12 đã nói tới.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 14 · Auth cơ bản bằng Express — bcrypt, JWT</div>
+    <p class="nd">Đăng ký/đăng nhập với mật khẩu hash (bcrypt) và token (JWT) — xương sống bảo mật của mọi hệ thống.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0012-ket-noi-postgresql.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm theo bài: tạo bảng courses + enrollments, chèn dữ liệu, thử vi phạm khóa ngoại để thấy lỗi, rồi chạy JOIN "user 1 học khóa nào" và gửi tôi output. Tôi sẽ kiểm tra bạn hiểu quan hệ nhiều-nhiều, khóa ngoại chặn gì, và đọc được ERD. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>

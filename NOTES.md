@@ -31,7 +31,7 @@
 - `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
-## Đang làm việc — Bài 12 (Kết nối PostgreSQL - SQL thật, CRUD users)
+## Đang làm việc — Bài 13 (Thiết kế database e-learning)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
@@ -41,5 +41,6 @@
 - ✅ **Cheat-sheet MỐC**: tạo `reference/node-express-cheatsheet.html` (Bài 05–11) — vì đã qua 5+ bài kể từ cheat-sheet gần nhất (rule A22).
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
 - Điểm yếu cần theo dõi: (1) `courses` là module-level array bị mutate giữa lần chạy tsx watch — bài 12 giải bằng PostgreSQL; (2) chưa thực hành xóa express.json() để thử lỗi; (3) chưa có thực hành xử lý lỗi stream (pipeline()).
-- Tiếp theo: học viên thực hành Bài 12 (đã soạn + verify). Sau khi học viên hoàn thành: ghi LR-0014 + bổ sung GLOSSARY thuật ngữ bài 12 (pg, Pool, parameterized query, SERIAL/PRIMARY KEY/UNIQUE, SQL injection) — quy tắc A23.
+- ✅ **Bài 13 ĐÃ SOẠN** (`0013-thiet-ke-database-elearning.html` — ERD users/courses/enrollments, quan hệ 1-1/1-nhiều/nhiều-nhiều, khóa ngoại REFERENCES/CHECK/UNIQUE tổ hợp, JOIN 3 bảng). Đã verify XANH trong DB tạm: CREATE bảng OK, insert OK, vi phạm FK bị chặn, vi phạm UNIQUE bị chặn, JOIN "user 1 học khóa nào" đúng. Chờ học viên thực hành.
+- Tiếp theo: học viên thực hành Bài 13 (đã soạn + verify). Sau khi hoàn thành: ghi LR-0015 + bổ sung GLOSSARY thuật ngữ bài 13 (ERD, foreign key, 1-nhiều, nhiều-nhiều, junction table, JOIN, CHECK, UNIQUE tổ hợp) — quy tắc A23.
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).
