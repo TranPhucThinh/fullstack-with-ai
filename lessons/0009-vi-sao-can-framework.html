@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+  Bài 09 · Vì sao cần framework? Bài toán Express giải quyết
+  Module 1 (bài cuối) — cầu nối từ Node thuần sang Express.
+-->
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 09 · Vì sao cần framework? Bài toán Express giải quyết</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 1 · Bài 09</span>
+  <h1>Vì sao cần framework? Bài toán Express giải quyết</h1>
+  <p class="subtitle">Nhìn lại 5 mảnh bạn đã tự xây tay ở các bài 06–08, rồi thấy Express đóng gói sẵn đúng từng mảnh đó — để hiểu bản chất trước khi dùng.</p>
+  <p class="meta-line">⏱ ~45 phút · 🎯 Mục tiêu: kể được 1-1 từng thứ bạn tự code bằng Node thuần tương ứng với API nào của Express, và giải thích được vì sao middleware là ý tưởng cốt lõi khiến framework thắng.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Ở bài 07 bạn tự viết bảng route <code>{ method, pattern, handler }</code>, hàm <code>parseQuery</code>, hàm <code>readBody</code> gom body từ stream, và validation thủ công. Ở bài 08 bạn dùng <code>process.env</code> để cấu hình PORT. Bài này không dạy thứ mới — nó <strong>đối chiếu</strong>: mỗi dòng bạn đã viết tay, Express có sẵn một API đúng chỗ đó. Khi hiểu được sự tương ứng này, bạn dùng Express không bao giờ bị "ma thuật".</p>
+  </div>
+
+  <h2>1. Bạn đã tự xây gì? — 5 mảnh ghép của mọi web server</h2>
+  <p>Hãy nhìn lại code <code>src/server.ts</code> bạn đang có — nó đã thao tác đủ 5 bài toán mà <strong>mọi</strong> web server phải giải, dù viết tay hay dùng framework:</p>
+
+  <table class="data">
+    <thead><tr><th>#</th><th>Bài toán</th><th>Bạn đã tự viết (bài 07–08)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1</strong></td><td>Định tuyến (routing)</td><td>Mảng <code>routes</code> với <code>{ method, pattern, handler }</code> + vòng lặp match regex</td></tr>
+      <tr><td><strong>2</strong></td><td>Đọc query string</td><td>Hàm <code>parseQuery</code> dùng <code>URLSearchParams</code></td></tr>
+      <tr><td><strong>3</strong></td><td>Đọc body (JSON)</td><td>Hàm <code>readBody</code> — <code>for await (const chunk of req)</code> rồi <code>JSON.parse</code></td></tr>
+      <tr><td><strong>4</strong></td><td>Kiểm tra dữ liệu đầu vào</td><td>Điều kiện <code>if (!data.title || typeof data.title !== 'string')</code> trả 400</td></tr>
+      <tr><td><strong>5</strong></td><td>Cấu hình môi trường</td><td><code>Number(process.env.PORT ?? 4000)</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Điểm cốt lõi</div>
+    <p>Framework KHÔNG làm điều gì khác — nó <strong>đóng gói 5 bài toán đó thành API chuẩn</strong>, để bạn không phải viết lại từ đầu mỗi dự án, và để team có chung một quy ước. Hiểu được 5 mảnh này là hiểu được xương sống của Express.</p>
+  </div>
+
+  <h2>2. Express — mỗi mảnh có một API tương ứng</h2>
+
+  <p>Theo <a href="https://expressjs.com/en/5x/guide/routing.html" target="_blank">tài liệu chính thức Express</a>: <em>"A route method is derived from one of the HTTP methods, and is attached to an instance of the express class."</em> Nghĩa là thay vì bảng route của bạn, Express đưa method thành hàm: <code>app.get()</code>, <code>app.post()</code>, <code>app.put()</code>, <code>app.delete()</code>...</p>
+
+  <div class="code-block">
+    <span class="code-label">So sánh: bảng route (bài 07) vs app.METHOD (Express)</span>
+<pre><code><span class="cmt">// ——— BẠN ĐÃ TỰ VIẾT (bài 07) ———</span>
+<span class="kw">const</span> routes = [
+  { method: <span class="str">'GET'</span>,  pattern: /^\/api\/courses$/,         handler: listCourses },
+  { method: <span class="str">'GET'</span>,  pattern: /^\/api\/courses\/(\d+)$/, handler: getCourse },
+  { method: <span class="str">'POST'</span>, pattern: /^\/api\/courses$/,         handler: createCourse },
+]
+<span class="cmt">// … rồi vòng for match từng route, nếu không match thì trả 404</span>
+
+<span class="cmt">// ——— EXPRESS (bài 10 sẽ học) ———</span>
+<span class="kw">import</span> express <span class="kw">from</span> <span class="str">'express'</span>
+<span class="kw">const</span> app = <span class="fn">express</span>()
+
+app.<span class="fn">get</span>(<span class="str">'/api/courses'</span>, listCourses)        <span class="cmt">// method + path + handler — tương đương 1 dòng trong bảng route</span>
+app.<span class="fn">get</span>(<span class="str">'/api/courses/:id'</span>, getCourse)    <span class="cmt">// :id là path parameter — tương đương regex (\d+) của bạn</span>
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, createCourse)</code></pre>
+  </div>
+
+  <h3>2.1. Routing: <code>:id</code> thay cho regex</h3>
+  <p>Bạn từng viết <code>/^\/api\/courses\/(\d+)$/</code> rồi lấy <code>match[1]</code>. Theo docs, Express có <strong>route parameters</strong>: <em>"Route parameters are named URL segments that are used to capture the values specified at their position in the URL. The captured values are populated in the <code>req.params</code> object."</em> — <code>:id</code> trong path, giá trị nằm ở <code>req.params.id</code>. Chính là <code>match[1]</code> của bạn, nhưng có tên và không cần tự viết regex.</p>
+
+  <div class="code-block">
+    <span class="code-label">Trích docs Express — req.params</span>
+<pre><code>Route path: /users/:userId/books/:bookId
+Request URL: http://localhost:3000/users/34/books/8989
+req.params: { "userId": "34", "bookId": "8989" }</code></pre>
+  </div>
+
+  <h3>2.2. Query: <code>req.query</code> thay cho parseQuery</h3>
+  <p>Hàm <code>parseQuery</code> của bạn dùng <code>URLSearchParams</code> để biến <code>?limit=1</code> thành object. Express có sẵn <code>req.query</code> — cũng là object từ query string. (Docs nhắc: <em>"Query strings are not part of the route path"</em> — tức query không nằm trong pattern route, mà nằm riêng ở <code>req.query</code>.)</p>
+
+  <h3>2.3. Body: <code>express.json()</code> thay cho readBody</h3>
+  <p>Hàm <code>readBody</code> của bạn gom chunk từ stream rồi <code>JSON.parse</code>. Express đóng gói chính xác việc này trong một middleware tên <code>express.json()</code> — sau khi chạy, body đã parse sẵn nằm ở <code>req.body</code>. Bạn học bài 07 để hiểu <em>dưới nền</em> nó làm gì, giờ chỉ cần gọi đúng middleware.</p>
+
+  <h3>2.4. Response: <code>res.json()</code> thay cho sendJson</h3>
+  <p>Hàm <code>sendJson</code> của bạn: <code>writeHead(200, {'Content-Type': 'application/json'})</code> + <code>end(JSON.stringify(data))</code>. Express có <code>res.json(data)</code> — vừa set Content-Type đúng, vừa stringify, vừa kết thúc response. Docs liệt kê <code>res.json()</code> trong các <em>"methods that send a response to the client, and terminate the request-response cycle"</em>; còn cảnh báo: <em>"If none of these methods are called from a route handler, the client request will be left hanging"</em> — giống hệt bài học <code>res.end()</code> ở bài 06.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao framework thắng — không phải vì "nhanh hơn"</div>
+    <p>Code Express <strong>không chạy nhanh hơn</strong> code tay của bạn (bản chất vẫn là node:http bên dưới). Nó thắng vì: (1) <strong>không viết lại</strong> 5 bài toán này mỗi dự án; (2) <strong>quy ước chung</strong> cho cả team (ai cũng biết <code>req.params</code>, <code>req.query</code>, <code>req.body</code> nghĩa là gì); (3) <strong>hệ sinh thái middleware</strong> — ý tưởng tiếp theo.</p>
+  </div>
+
+  <h2>3. Middleware — thứ bạn CHƯA tự xây, và là lý do framework tồn tại</h2>
+
+  <p>5 mảnh trên bạn đều có thể tự viết tay. Nhưng có một bài toán bạn chưa từng giải: <strong>các bước dùng chung cho mọi route</strong> — ghi log, kiểm tra auth, đọc body, ... nếu không có cơ chế chung, bạn phải lặp lại code đó trong <em>từng</em> handler. Đây chính là câu hỏi tư duy cuối bài 08.</p>
+
+  <p>Express giải bằng ý tưởng <strong>middleware</strong>: mỗi hàm <code>(req, res, next)</code> làm xong việc của mình rồi gọi <code>next()</code> để chuyển request sang hàm kế tiếp — như một đường ống. Chính docs gọi handler của Express là middlewares: <em>"You can provide multiple callback functions that behave like middleware to handle a request. The only exception is that these callbacks might invoke <code>next('route')</code> to bypass the remaining route callbacks."</em></p>
+
+  <div class="code-block">
+    <span class="code-label">Ý tưởng middleware — ba hàm nối tiếp nhau như đường ống</span>
+<pre><code><span class="cmt">// Mỗi middleware: (req, res, next) => {…}; gọi next() để chuyển tiếp</span>
+app.<span class="fn">use</span>(<span class="fn">logRequest</span>)        <span class="cmt">// 1. ghi log mọi request</span>
+app.<span class="fn">use</span>(<span class="fn">express.json</span>())   <span class="cmt">// 2. đọc + parse body (chính là readBody của bạn)</span>
+app.<span class="fn">use</span>(<span class="fn">checkAuth</span>)        <span class="cmt">// 3. kiểm tra token — không qua thì trả 401, không gọi next()</span>
+
+app.<span class="fn">get</span>(<span class="str">'/api/courses'</span>, listCourses)  <span class="cmt">// 4. tới đây là handler cuối — trả dữ liệu</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Kể được 5 bài toán mọi web server phải giải (routing, query, body, validation, env)</li>
+      <li>Đối chiếu 1-1 từng thứ bạn tự viết tay với API Express: <code>app.METHOD</code> ↔ bảng route, <code>:id</code> ↔ regex, <code>req.query</code> ↔ parseQuery, <code>express.json()</code> ↔ readBody, <code>res.json()</code> ↔ sendJson</li>
+      <li>Hiểu middleware là đường ống <code>(req, res, next)</code> — giải bài toán "code dùng chung cho mọi route" mà bạn chưa giải ở bài 07–08</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Ở bài 07 bạn viết <code>pattern: /^\/api\/courses\/(\d+)$/</code> + <code>match[1]</code>. Trong Express, hai thứ đó tương ứng với gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — app.get chỉ là method+path, còn việc bắt giá trị từ URL là của path parameter.">A. <code>app.get()</code> và <code>req.query</code></button>
+    <button class="opt" data-correct="true" data-explain="Đúng! <code>:id</code> trong path là route parameter — Express tự bắt giá trị URL vào <code>req.params.id</code>, tương đương match[1] của bạn. Còn query là thứ khác (tham số sau ?).">B. <code>app.get('/api/courses/:id')</code> và <code>req.params.id</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — req.body là body của POST, không phải giá trị id trong URL.">C. <code>app.post()</code> và <code>req.body.id</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Hàm <code>readBody</code> bạn viết ở bài 07 (gom chunk + JSON.parse) tương ứng với gì trong Express?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — res.json() là phía response (trả dữ liệu), không phải đọc body.">A. <code>res.json(data)</code></button>
+    <button class="opt" data-correct="true" data-explain="Đúng! <code>express.json()</code> là middleware đọc body từ stream rồi parse JSON — sau nó, body nằm ở <code>req.body</code>.">B. Middleware <code>express.json()</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — parseQuery của bạn xử lý query string (?a=1), còn readBody xử lý body. Đây là hai thứ khác nhau.">C. <code>req.query</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao middleware là ý tưởng quan trọng của Express mà tự viết tay khó làm?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — Express không tự xử lý auth; nó chỉ cho phép bạn xếp auth thành một mắt xích dùng chung trong đường ống.">A. Vì Express tự động kiểm tra auth cho mọi route</button>
+    <button class="opt" data-correct="false" data-explain="Ngược lại — middleware giúp TRÁNH lặp code dùng chung.">B. Vì buộc mỗi handler phải tự viết lại log/auth/body</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Với (req, res, next), các bước dùng chung (log, auth, body) viết MỘT lần rồi xếp vào đường ống trước handler — mọi route tự động được phủ.">C. Vì các bước dùng chung (log, auth, body) viết một lần, xếp thành đường ống <code>(req, res, next)</code>, áp dụng cho mọi route</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>4. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã thấy Express đóng gói routing, query, body, response thành API. Nhưng để dùng được, bạn phải <strong>cài Express vào dự án</strong> — thêm dependency, viết <code>app.listen()</code>, chạy thử. Câu hỏi: với kinh nghiệm bài 08 (env, exit code), bạn sẽ cấu hình cổng của app Express như thế nào cho đúng chuẩn? Và thứ tự middleware nào nên đứng trước <code>app.get('/api/courses')</code>? Sang bài 10 bạn sẽ cài Express thật và trả lời bằng code chạy được.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 10 · Express cơ bản — routing, middleware</div>
+    <p class="nd">Cài Express vào dự án e-learning, viết lại server của bạn bằng app.get/app.post/express.json(), và chạy thật xem mọi thứ tương ứng 1-1 với code tay bạn đã viết.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0008-file-stream-process-env.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Có gì chưa rõ về cách Express đóng gói 5 bài toán — hoặc muốn tôi chỉ rõ từng dòng trong <code>src/server.ts</code> của bạn tương ứng với API nào — cứ hỏi. Bài này là nền để bài 10 bạn viết code thật.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
