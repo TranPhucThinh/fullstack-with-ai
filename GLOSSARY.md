@@ -53,3 +53,10 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **process.exitCode** | Mã thoát để shell biết thành công (0) hay thất bại (≠0) — đặt thay vì gọi `process.exit()` để stdout flush kịp | 08 |
 | **EADDRINUSE** | Lỗi "địa chỉ đang được dùng" khi cổng đã bị tiến trình khác chiếm — xử lý: đổi cổng hoặc dừng tiến trình cũ | 08 |
 | **`.env`** | File lưu biến môi trường local của dự án — không commit lên git; đây là nơi đặt PORT, secret, URL database | 08 |
+| **app.METHOD()** | API Express định nghĩa route: `app.get()`, `app.post()`, `app.put()`, `app.delete()`... — đóng gói bảng route `{ method, pattern, handler }` tự viết tay | 09 |
+| **route parameter** | Đoạn URL có tên bắt giá trị, khai báo bằng `:name` trong path — giá trị nằm ở `req.params.name`; thay cho regex + `match[1]` | 09 |
+| **req.params** | Object chứa các route parameter đã bắt từ URL — ví dụ `/users/:id` → `req.params.id` | 09 |
+| **req.query** | Object chứa query string đã parse — thay cho hàm `parseQuery` tự viết (URLSearchParams) | 09 |
+| **express.json()** | Middleware đọc body từ stream rồi parse JSON — sau nó body nằm ở `req.body`; đóng gói hàm `readBody` tự viết | 09 |
+| **res.json()** | Phương thức trả JSON: set Content-Type + stringify + kết thúc response — đóng gói hàm `sendJson` tự viết | 09 |
+| **middleware** | Hàm `(req, res, next)` làm xong việc rồi gọi `next()` để chuyển request sang bước kế — đường ống cho các bước dùng chung (log, auth, body) áp dụng mọi route | 09 |
