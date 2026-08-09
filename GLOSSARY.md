@@ -63,3 +63,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **app.use()** | Đăng ký middleware vào đường ống xử lý mọi request theo thứ tự khai báo — `app.use(express.json())` đặt body vào `req.body` trước khi tới route handler | 10 |
 | **req.body** | Object chứa body đã parse JSON (nhờ `express.json()`) — undefined nếu quên middleware; dùng `req.body ?? {}` để phòng undefined | 10 |
 | **res.status().json()** | Chuỗi method chainable: set status code rồi gửi JSON — `res.json()` mặc định 200; muốn 400/404/201 phải gọi `.status(...)` trước | 10 |
+| **middleware log tự viết** | Middleware `(req, res, next)` do lập trình viên tạo — in log (timestamp + method + url) rồi gọi `next()`; đặt TRƯỚC route để chạy cho mọi request | 11 |
+| **next()** | Hàm Express chuyển request sang middleware/handler tiếp theo — bắt buộc gọi nếu middleware không tự kết thúc response, nếu không request bị treo | 11 |
+| **error-handling middleware** | Middleware đặc biệt có ĐÚNG 4 tham số `(err, req, res, next)` — Express nhận biết bằng số tham số; bắt lỗi từ handler và trả response (vd JSON 500) | 11 |
+| **CORS (Cross-Origin Resource Sharing)** | Cơ chế cho phép trình duyệt gọi API từ domain khác qua header `Access-Control-Allow-Origin` — middleware `cors()` đặt đầu để header phủ mọi response | 11 |
+| **Access-Control-Allow-Origin** | Header do server trả để trình duyệt cho phép JS đọc response từ origin khác — `*` nghĩa là cho phép mọi origin (đủ cho dev, production cần giới hạn) | 11 |
+| **throw trong route handler** | Ném lỗi đồng bộ từ handler — Express 5 tự chuyển tới error-handling middleware; không có middleware này sẽ trả HTML lỗi mặc định | 11 |

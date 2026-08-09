@@ -1,8 +1,15 @@
-import express, { type Request, type Response } from 'express'
+import express, { NextFunction, type Request, type Response } from 'express'
 import { courses, createCourseId } from './courses.js'
+import cors from 'cors'
 
 const app = express()
+app.use(cors())
 app.use(express.json())
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+  next()
+})
 
 app.get('/api/courses', (req: Request, res: Response) => {
   const limit = Number(req.query.limit ?? courses.length)
@@ -34,6 +41,15 @@ app.post('/api/courses', (req: Request, res: Response) => {
   courses.push(course)
 
   res.status(201).json(course)
+})
+
+app.get('/api/boom', () => {
+  throw new Error('Có lỗi xảy ra!')
+})
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Lỗi:', err.message)
+  res.status(500).json({ error: 'Internal Server Error' })
 })
 
 const PORT = Number(process.env.PORT ?? 4000)

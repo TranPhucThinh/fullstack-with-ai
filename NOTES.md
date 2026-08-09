@@ -30,7 +30,7 @@
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
 - ✅ **Bài 10 HOÀN THÀNH** (học viên tự viết `src/server.ts` bằng Express 5.2.1; typecheck exit 0 + 6 endpoint curl XANH trên cổng 4000; LR-0012 + GLOSSARY thuật ngữ bài 10 đã ghi; đã commit+push code bài tập của học viên).
-- ✅ **Bài 11 ĐÃ SOẠN** (`0011-middleware-nang-cao.html` — middleware log tự viết, error-handling 4 tham số, CORS; cài cors 2.8.6 + @types/cors 2.8.19; verify XANH: log in ra, Access-Control-Allow-Origin: *, /api/boom trả JSON 500 không crash). Đã cập nhật index.html (bài 11 → now "sẵn sàng", progress 11/~66). Chờ học viên thực hành.
+- ✅ **Bài 11 HOÀN THÀNH** (`src/server.ts` học viên viết đã chạy XANH: log in ra, Access-Control-Allow-Origin: *, /api/boom trả JSON 500 không crash; LR-0013 + GLOSSARY đã ghi; sẽ commit + push code bài tập cùng bài 11).
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
 - Điểm yếu cần theo dõi: (1) `courses` là module-level array bị mutate giữa lần chạy tsx watch — bài 12 giải bằng PostgreSQL; (2) chưa thực hành xóa express.json() để thử lỗi; (3) chưa có thực hành xử lý lỗi stream (pipeline()).
 - Tiếp theo: soạn `lessons/0012-ket-noi-postgresql.html` — dùng Docker container PostgreSQL (đã có docker-compose bài 00), cài `pg`, CRUD users bằng SQL thật.
