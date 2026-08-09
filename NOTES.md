@@ -25,11 +25,12 @@
 - `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
-## Đang làm việc — Bài 10 (Express cơ bản — routing, middleware)
+## Đang làm việc — Bài 11 (Middleware nâng cao — error, logging, CORS)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
-- ✅ **Bài 09 HOÀN THÀNH soạn** (`0009-vi-sao-can-framework.html` — bài cầu nối: đối chiếu routing table/query/body/env ↔ Express API; trích docs Express 5.x routing). Đã cập nhật index.html (bài 08/09 → done, progress 9/~66). Chờ học viên đọc.
+- ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
+- ✅ **Bài 10 ĐÃ SOẠN** (`0010-express-co-ban.html` — cài Express 5.2.1 + @types/express 5.0.6, viết lại server courses bằng app.METHOD/req.query/req.params/req.body/res.json; verify 6 endpoint curl XANH). Đã cập nhật index.html (bài 10 → now "sẵn sàng", progress 10/~66). Chờ học viên thực hành.
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
 - Điểm yếu cần theo dõi: chưa có thực hành xử lý lỗi stream (sự kiện `error`/`pipeline()`) — sẽ gặp khi bài upload file.
-- Tiếp theo: soạn `lessons/0010-express-co-ban.html` — cài Express vào dự án, viết lại server bằng app.get/app.post/express.json()/res.json(), chạy thật.
+- Tiếp theo: soạn `lessons/0011-middleware-nang-cao.html` — middleware log tự viết, error-handling middleware (4 tham số), CORS.
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).

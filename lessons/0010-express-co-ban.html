@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!--
+  Bài 10 · Express cơ bản — routing, middleware
+  Module 2 (bài đầu) — cài Express, viết lại server courses bằng app.METHOD/express.json()/res.json().
+-->
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 10 · Express cơ bản — routing, middleware</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 10</span>
+  <h1>Express cơ bản — routing, middleware</h1>
+  <p class="subtitle">Cài Express vào dự án e-learning, viết lại server courses bằng app.get/app.post/express.json()/res.json() — và thấy mọi thứ tương ứng 1-1 với code tay bạn đã viết ở bài 07–08.</p>
+  <p class="meta-line">⏱ ~60 phút · 🎯 Mục tiêu: dự án e-learning chạy bằng Express thật (thay cho server.ts Node thuần), với đủ GET list/limit, GET :id, POST + validation — verify bằng curl.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 09 bạn đã đối chiếu: bảng route ↔ <code>app.METHOD()</code>, regex ↔ <code>:id</code> → <code>req.params</code>, <code>parseQuery</code> ↔ <code>req.query</code>, <code>readBody</code> ↔ <code>express.json()</code>, <code>sendJson</code> ↔ <code>res.json()</code>. Bài này bạn <strong>viết thật</strong> — thay toàn bộ <code>src/server.ts</code> Node thuần bằng Express, chạy và curl. Mỗi dòng Express bạn viết hôm nay là một dòng bạn đã tự làm tay trước đó.</p>
+  </div>
+
+  <h2>1. Cài Express vào dự án</h2>
+  <p>Express là package npm. Cài vào <code>dependencies</code> (cần ở production), và <code>@types/express</code> vào <code>devDependencies</code> (chỉ cần khi phát triển, để TypeScript hiểu type của Express).</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — từ thư mục elearning-backend/</span>
+<pre><code><span class="cmt"># Cài Express (chạy ở production) + type cho TypeScript (chỉ lúc phát triển)</span>
+<span class="tbl">npm</span> install express
+<span class="tbl">npm</span> install -D @types/express</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (Node v24.16.0)</div>
+    <p>Cài xong, <code>package.json</code> có <code>"express": "^5.2.1"</code> trong dependencies và <code>"@types/express": "^5.0.6"</code> trong devDependencies. Lưu ý: đây là <strong>Express 5.x</strong> — docs chính thức hiện tại là <a href="https://expressjs.com/en/5x/guide/routing.html" target="_blank">expressjs.com/en/5x</a>.</p>
+  </div>
+
+  <h2>2. Viết lại server bằng Express</h2>
+  <p>Thay toàn bộ nội dung <code>src/server.ts</code> bằng code dưới đây. Đối chiếu từng phần với code cũ:</p>
+
+  <table class="data">
+    <thead><tr><th>Code tay (bài 07–08)</th><th>Express (bài này)</th></tr></thead>
+    <tbody>
+      <tr><td><code>createServer(...)</code> + vòng for match routes</td><td><code>const app = express()</code> + <code>app.get()/app.post()</code></td></tr>
+      <tr><td><code>parseQuery</code> (URLSearchParams)</td><td><code>req.query</code> — có sẵn</td></tr>
+      <tr><td><code>readBody</code> (gom chunk + JSON.parse)</td><td><code>app.use(express.json())</code> → <code>req.body</code></td></tr>
+      <tr><td><code>sendJson</code> (writeHead + end)</td><td><code>res.json()</code> / <code>res.status(...).json()</code></td></tr>
+      <tr><td><code>match[1]</code> từ regex <code>(\d+)</code></td><td><code>req.params.id</code> từ <code>:id</code></td></tr>
+      <tr><td><code>server.listen(PORT, HOST, ...)</code></td><td><code>app.listen(PORT, ...)</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — viết lại bằng Express (thay toàn bộ file)</span>
+<pre><code><span class="kw">import</span> express, { <span class="kw">type</span> Request, <span class="kw">type</span> Response } <span class="kw">from</span> <span class="str">'express'</span>
+<span class="kw">import</span> { courses, createCourseId } <span class="kw">from</span> <span class="str">'./courses.js'</span>
+
+<span class="kw">const</span> app = <span class="fn">express</span>()
+app.<span class="fn">use</span>(<span class="fn">express.json</span>()) <span class="cmt">// middleware: đọc + parse body JSON — chính là readBody bạn tự viết ở bài 07</span>
+
+<span class="cmt">// GET /api/courses?limit=1 — trả danh sách (hỗ trợ limit)</span>
+app.<span class="fn">get</span>(<span class="str">'/api/courses'</span>, (req: Request, res: Response) => {
+  <span class="kw">const</span> limit = <span class="fn">Number</span>(req.query.limit ?? courses.length) <span class="cmt">// req.query thay parseQuery</span>
+  res.<span class="fn">json</span>(courses.<span class="fn">slice</span>(<span class="num">0</span>, limit)) <span class="cmt">// res.json thay sendJson</span>
+})
+
+<span class="cmt">// GET /api/courses/:id — trả 1 khóa học</span>
+app.<span class="fn">get</span>(<span class="str">'/api/courses/:id'</span>, (req: Request, res: Response) => {
+  <span class="kw">const</span> course = courses.<span class="fn">find</span>((c) => c.id === <span class="fn">Number</span>(req.params.id)) <span class="cmt">// req.params.id thay match[1]</span>
+  <span class="kw">if</span> (course) res.<span class="fn">json</span>(course)
+  <span class="kw">else</span> res.<span class="fn">status</span>(<span class="num">404</span>).<span class="fn">json</span>({ error: <span class="str">'Course not found'</span> })
+})
+
+<span class="cmt">// POST /api/courses — validation thiếu title -> 400</span>
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, (req: Request, res: Response) => {
+  <span class="kw">const</span> { title, price } = req.body ?? {} <span class="cmt">// req.body có sẵn nhờ express.json()</span>
+  <span class="kw">if</span> (!title || <span class="kw">typeof</span> title !== <span class="str">'string'</span>) {
+    res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'title là bắt buộc (string)'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> id = <span class="fn">createCourseId</span>()
+  <span class="kw">const</span> course = { id, title, price: <span class="fn">Number</span>(price) }
+  courses.<span class="fn">push</span>(course)
+  res.<span class="fn">status</span>(<span class="num">201</span>).<span class="fn">json</span>(course)
+})
+
+<span class="cmt">// PORT đọc từ env — giữ nguyên bài 08</span>
+<span class="kw">const</span> PORT = <span class="fn">Number</span>(process.env.PORT ?? <span class="num">4000</span>)
+app.<span class="fn">listen</span>(PORT, () => {
+  console.<span class="fn">log</span>(`✅ Express running at http://localhost:${PORT}`)
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao không cần HOST nữa?</div>
+    <p>Code cũ có <code>server.listen(PORT, HOST, ...)</code> với <code>HOST = '0.0.0.0'</code>. <code>app.listen(PORT)</code> của Express mặc định lắng nghe mọi interface (tương đương 0.0.0.0) — nên không cần khai báo HOST. Đây là một ví dụ Express đã "đóng gói" quyết định mặc định hợp lý.</p>
+  </div>
+
+  <h2>3. Chạy và verify bằng curl</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 1 — chạy server</span>
+<pre><code><span class="tbl">npm</span> run dev</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 2 — curl 6 trường hợp (giống hệt bài 07)</span>
+<pre><code><span class="cmt"># 1. GET list — trả 2 khóa học</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/courses
+
+<span class="cmt"># 2. GET ?limit=1 — trả 1 khóa học</span>
+<span class="fn">curl</span> -s "http://localhost:4000/api/courses?limit=1"
+
+<span class="cmt"># 3. GET /:id=2 — trả khóa học id 2</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/courses/2
+
+<span class="cmt"># 4. GET /:id=99 — 404</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/courses/99
+
+<span class="cmt"># 5. POST thiếu title — 400</span>
+<span class="fn">curl</span> -s -X POST -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"price":100}'</span> http://localhost:4000/api/courses
+
+<span class="cmt"># 6. POST hợp lệ — 201, trả khóa học mới</span>
+<span class="fn">curl</span> -s -X POST -H <span class="str">"Content-Type: application/json"</span> -d <span class="str">'{"title":"Express cơ bản","price":300000}'</span> http://localhost:4000/api/courses</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Kết quả đã kiểm chứng (Express 5.2.1, Node v24.16.0)</div>
+    <p>Chạy <code>PORT=4321 npx tsx demo/express-verify.ts</code> (bản verify tạm) rồi curl 6 trường hợp — tất cả đúng: list 2 courses, limit=1 còn 1, id=2 trả đúng, id=99 trả <code>{"error":"Course not found"}</code>, POST thiếu title trả <code>{"error":"title là bắt buộc (string)"}</code>, POST hợp lệ trả <code>{"id":3,...}</code>. Code trong bài chính là bản verify đó, chỉ đổi đường dẫn file.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Lưu ý khi chạy</div>
+    <p>Nếu cổng 4000 bị chiếm (bài 08 bạn đã gặp EADDRINUSE), đổi cổng: <code>PORT=4321 npm run dev</code>. Và nhớ: <code>npm run dev</code> dùng <code>tsx watch</code> — sửa file là tự reload, không cần chạy lại.</p>
+  </div>
+
+  <h2>4. Middleware — bạn vừa dùng cái đầu tiên</h2>
+  <p>Dòng <code>app.use(express.json())</code> chính là middleware — khái niệm bài 09. Nó chạy <strong>trước</strong> mọi route handler, đọc body từ stream, parse JSON, rồi gắn kết quả vào <code>req.body</code> và gọi <code>next()</code> để request đi tiếp. Nếu bạn quên dòng này, <code>req.body</code> sẽ là <code>undefined</code> — POST sẽ vỡ. Hãy thử xóa dòng đó và chạy lại POST để thấy sự khác biệt.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao gọi là "đường ống"?</div>
+    <p>Request đi qua từng middleware theo thứ tự khai báo: <code>express.json()</code> → route handler. Mỗi mắt xích làm một việc rồi chuyển tiếp bằng <code>next()</code>. Bài 11 sẽ viết middleware của riêng bạn (log, error, CORS).</p>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Cài Express 5.2.1 + @types/express vào dự án</li>
+      <li>Viết lại server courses bằng Express: <code>app.get</code>/<code>app.post</code>, <code>req.query</code>, <code>req.params</code>, <code>req.body</code>, <code>res.json()</code>, <code>res.status()</code></li>
+      <li>Verify 6 trường hợp curl chạy đúng — dự án e-learning giờ chạy bằng Express thật</li>
+      <li>Hiểu <code>app.use(express.json())</code> là middleware đầu tiên bạn dùng</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Bạn quên viết <code>app.use(express.json())</code>. Điều gì xảy ra khi POST /api/courses?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — không có middleware thì body không được đọc/parse, req.body là undefined, không phải object rỗng.">A. <code>req.body</code> là <code>{}</code> — POST vẫn chạy bình thường</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Không có express.json(), body không được đọc từ stream — req.body là undefined, destructure { title, price } sẽ vỡ (TypeError).">B. <code>req.body</code> là <code>undefined</code> — destructure <code>{ title, price }</code> sẽ vỡ</button>
+    <button class="opt" data-correct="false" data-explain="Sai — Express không tự đọc body; phải có middleware express.json() (hoặc tương đương).">C. Express tự đọc body — không cần middleware</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. <code>req.params.id</code> trong <code>app.get('/api/courses/:id', ...)</code> tương ứng với gì trong code tay bài 07?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Regex /^\/api\/courses\/(\d+)$/ bắt số vào match[1] — Express gói thành :id → req.params.id.">A. <code>match[1]</code> từ regex <code>(\d+)</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — query là tham số sau dấu ?, không phải phần id trong URL path.">B. <code>query.limit</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — body là dữ liệu POST, không phải id trong URL.">C. <code>data.title</code> từ body</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao <code>res.status(404).json(...)</code> cần gọi <code>status()</code> trước, còn <code>res.json(...)</code> thì không?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — res.json() mặc định status 200; muốn khác 200 phải set status trước.">A. Vì res.json() luôn trả 404</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! res.json() mặc định 200 OK. Muốn trả 400/404/201 phải gọi res.status(...) trước — giống code tay bạn viết writeHead(status, ...) trước end().">B. Vì <code>res.json()</code> mặc định status 200 — muốn status khác phải set trước bằng <code>res.status()</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — status() và json() là chainable; thứ tự status trước json là đúng, không phải bắt buộc ngược lại.">C. Vì phải gọi json() trước rồi mới status()</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>5. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa dùng middleware có sẵn <code>express.json()</code>. Nhưng trong dự án thật còn nhiều việc dùng chung: ghi log mỗi request, bắt lỗi để không crash server, cho phép frontend gọi từ domain khác (CORS). Làm sao viết middleware của riêng mình? Và khi handler ném lỗi, Express xử lý ra sao? Bài 11 — Middleware nâng cao — sẽ trả lời bằng code chạy được.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 11 · Middleware nâng cao — error, logging, CORS</div>
+    <p class="nd">Viết middleware log của riêng bạn, hiểu error-handling middleware (4 tham số!), và bật CORS cho frontend.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0009-vi-sao-can-framework.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Viết lại <code>src/server.ts</code> bằng Express, chạy <code>npm run dev</code>, curl 6 trường hợp và gửi tôi kết quả. Thử xóa <code>app.use(express.json())</code> rồi POST lại để tự thấy vì sao cần middleware. Có gì chưa rõ về sự tương ứng với code tay — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
