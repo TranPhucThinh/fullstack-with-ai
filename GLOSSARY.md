@@ -60,3 +60,6 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **express.json()** | Middleware đọc body từ stream rồi parse JSON — sau nó body nằm ở `req.body`; đóng gói hàm `readBody` tự viết | 09 |
 | **res.json()** | Phương thức trả JSON: set Content-Type + stringify + kết thúc response — đóng gói hàm `sendJson` tự viết | 09 |
 | **middleware** | Hàm `(req, res, next)` làm xong việc rồi gọi `next()` để chuyển request sang bước kế — đường ống cho các bước dùng chung (log, auth, body) áp dụng mọi route | 09 |
+| **app.use()** | Đăng ký middleware vào đường ống xử lý mọi request theo thứ tự khai báo — `app.use(express.json())` đặt body vào `req.body` trước khi tới route handler | 10 |
+| **req.body** | Object chứa body đã parse JSON (nhờ `express.json()`) — undefined nếu quên middleware; dùng `req.body ?? {}` để phòng undefined | 10 |
+| **res.status().json()** | Chuỗi method chainable: set status code rồi gửi JSON — `res.json()` mặc định 200; muốn 400/404/201 phải gọi `.status(...)` trước | 10 |

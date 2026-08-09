@@ -25,12 +25,12 @@
 - `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
-## Đang làm việc — Bài 11 (Middleware nâng cao — error, logging, CORS)
+## Đang làm việc — Bài 12 (Kết nối PostgreSQL - SQL thật, CRUD users)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
-- ✅ **Bài 10 ĐÃ SOẠN** (`0010-express-co-ban.html` — cài Express 5.2.1 + @types/express 5.0.6, viết lại server courses bằng app.METHOD/req.query/req.params/req.body/res.json; verify 6 endpoint curl XANH). Đã cập nhật index.html (bài 10 → now "sẵn sàng", progress 10/~66). Chờ học viên thực hành.
+- ✅ **Bài 10 HOÀN THÀNH** (học viên tự viết `src/server.ts` bằng Express 5.2.1; typecheck exit 0 + 6 endpoint curl XANH trên cổng 4000; LR-0012 + GLOSSARY thuật ngữ bài 10 đã ghi; đã commit+push code bài tập của học viên).
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
-- Điểm yếu cần theo dõi: chưa có thực hành xử lý lỗi stream (sự kiện `error`/`pipeline()`) — sẽ gặp khi bài upload file.
-- Tiếp theo: soạn `lessons/0011-middleware-nang-cao.html` — middleware log tự viết, error-handling middleware (4 tham số), CORS.
+- Điểm yếu cần theo dõi: (1) `courses` là module-level array bị mutate giữa lần chạy tsx watch — bài 12 giải bằng PostgreSQL; (2) chưa thực hành xóa express.json() để thử lỗi; (3) chưa có thực hành xử lý lỗi stream (pipeline()).
+- Tiếp theo: soạn `lessons/0012-ket-noi-postgresql.html` — dùng Docker container PostgreSQL (đã có docker-compose bài 00), cài `pg`, CRUD users bằng SQL thật.
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).
