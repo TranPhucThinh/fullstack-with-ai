@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<!--
+  Bài 11 · Middleware nâng cao — error, logging, CORS
+  Module 2 — viết middleware của riêng mình, error-handling 4 tham số, bật CORS.
+-->
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 11 · Middleware nâng cao — error, logging, CORS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 11</span>
+  <h1>Middleware nâng cao — error, logging, CORS</h1>
+  <p class="subtitle">Viết middleware log của riêng bạn, hiểu error-handling middleware (4 tham số!), và bật CORS cho frontend — ba thứ mọi API production đều cần.</p>
+  <p class="meta-line">⏱ ~60 phút · 🎯 Mục tiêu: server e-learning có middleware log tự viết, error-handling trả JSON 500 thay vì crash, và CORS bật cho frontend — verify bằng curl.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 10 bạn đã dùng middleware có sẵn <code>express.json()</code> — nó đọc body rồi gọi <code>next()</code> để request đi tiếp. Bài này bạn <strong>tự viết middleware</strong>: một hàm <code>(req, res, next)</code> làm việc của mình rồi gọi <code>next()</code>. Đồng thời học hai middleware quan trọng: error-handling (chống crash) và CORS (cho frontend gọi API).</p>
+  </div>
+
+  <h2>1. Middleware log tự viết — thấy request bằng mắt</h2>
+  <p>Theo <a href="https://expressjs.com/en/5x/guide/writing-middleware.html" target="_blank">tài liệu chính thức Express</a>: <em>"Middleware functions are functions that have access to the request object (req), the response object (res), and the next function in the application's request-response cycle."</em> Và quan trọng: <em>"If the current middleware function does not end the request-response cycle, it must call <code>next()</code> to pass control to the next middleware function. Otherwise, the request will be left hanging."</em></p>
+
+  <p>Docs đưa ví dụ <code>myLogger</code> — in "LOGGED" mỗi khi có request đi qua. Ta nâng cấp thành log có timestamp + method + URL:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm middleware log (đặt TRƯỚC các route)</span>
+<pre><code><span class="kw">import</span> express, { <span class="kw">type</span> Request, <span class="kw">type</span> Response, <span class="kw">type</span> NextFunction } <span class="kw">from</span> <span class="str">'express'</span>
+
+<span class="cmt">// Middleware log tự viết — chạy cho MỌI request, theo thứ tự khai báo</span>
+app.<span class="fn">use</span>((req: Request, res: Response, next: NextFunction) => {
+  console.<span class="fn">log</span>(`[${<span class="kw">new</span> <span class="fn">Date</span>().<span class="fn">toISOString</span>()}] ${req.method} ${req.url}`)
+  <span class="fn">next</span>() <span class="cmt">// BẮT BUỘC gọi — không gọi thì request treo, client chờ mãi</span>
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao phải đặt TRƯỚC route?</div>
+    <p>Docs nhấn mạnh: <em>"The order of middleware loading is important: middleware functions that are loaded first are also executed first. If myLogger is loaded after the route to the root path, the request never reaches it... because the route handler terminates the request-response cycle."</em> — Route handler trả response xong là request kết thúc, middleware khai báo sau không bao giờ chạy.</p>
+  </div>
+
+  <h2>2. Error-handling middleware — 4 tham số, chống crash</h2>
+  <p>Khi một handler ném lỗi (vd đọc database lỗi), nếu không xử lý, Express 5 sẽ trả về HTML lỗi mặc định — không phải JSON API của bạn. Giải pháp: <strong>error-handling middleware</strong>, nhận biết bằng <strong>4 tham số</strong> <code>(err, req, res, next)</code>. Docs: <em>"If you pass anything to the next() function (except the string 'route' or 'router'), Express regards the current request as being an error and will skip any remaining non-error handling routing and middleware functions."</em></p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — error-handling middleware (đặt SAU CÙNG, sau mọi route)</span>
+<pre><code><span class="cmt">// Route cố tình ném lỗi để test (thêm tạm, xong bài thì xóa)</span>
+app.<span class="fn">get</span>(<span class="str">'/api/boom'</span>, () => {
+  <span class="kw">throw</span> <span class="kw">new</span> <span class="fn">Error</span>(<span class="str">'Có lỗi xảy ra!'</span>)
+})
+
+<span class="cmt">// Error-handling middleware — 4 tham số (err, req, res, next) là DẤU HIỆU NHẬN BIẾT</span>
+app.<span class="fn">use</span>((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.<span class="fn">error</span>(<span class="str">'Lỗi:'</span>, err.message) <span class="cmt">// ghi log lỗi ra terminal</span>
+  res.<span class="fn">status</span>(<span class="num">500</span>).<span class="fn">json</span>({ error: <span class="str">'Internal Server Error'</span> }) <span class="cmt">// trả JSON thay vì HTML mặc định</span>
+})</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Vì sao Express biết đây là error-handler?</div>
+    <p>Express nhận biết bằng <strong>số tham số</strong>: hàm có đúng 4 tham số <code>(err, req, res, next)</code> được coi là error-handling middleware. Hàm 3 tham số <code>(req, res, next)</code> là middleware thường. Đừng bỏ tham số <code>err</code> — nếu chỉ viết <code>(req, res, next)</code> thì nó thành middleware thường và không bắt được lỗi.</p>
+  </div>
+
+  <h2>3. CORS — cho frontend gọi API từ domain khác</h2>
+  <p>Trình duyệt chặn JavaScript gọi API từ domain khác (Same-Origin Policy). Khi frontend React của bạn (chạy ở <code>localhost:3000</code>) gọi backend (<code>localhost:4000</code>), trình duyệt sẽ chặn trừ khi server trả header <code>Access-Control-Allow-Origin</code>. Express có middleware <code>cors</code> chính thức làm việc này.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — cài cors</span>
+<pre><code><span class="tbl">npm</span> install cors
+<span class="tbl">npm</span> install -D @types/cors</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — bật CORS (đặt đầu tiên, trước mọi thứ)</span>
+<pre><code><span class="kw">import</span> cors <span class="kw">from</span> <span class="str">'cors'</span>
+
+<span class="kw">const</span> app = <span class="fn">express</span>()
+app.<span class="fn">use</span>(<span class="fn">cors</span>()) <span class="cmt">// cho phép mọi origin gọi API — đủ cho dev; production sẽ giới hạn danh sách</span>
+app.<span class="fn">use</span>(<span class="fn">express</span>.<span class="fn">json</span>())</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao cors() đặt đầu tiên?</div>
+    <p>Header CORS phải có mặt trong <strong>mọi response</strong>, kể cả response lỗi. Đặt <code>cors()</code> đầu tiên đảm bảo nó chạy trước mọi thứ khác — kể cả error-handler — nên response nào cũng có header CORS. Đây là lý do thứ tự middleware quan trọng (bài 10 đã thấy với express.json).</p>
+  </div>
+
+  <h2>4. Ghép lại — server.ts hoàn chỉnh bài 11</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm 3 middleware vào code bài 10 của bạn</span>
+<pre><code><span class="kw">import</span> express, { <span class="kw">type</span> Request, <span class="kw">type</span> Response, <span class="kw">type</span> NextFunction } <span class="kw">from</span> <span class="str">'express'</span>
+<span class="kw">import</span> cors <span class="kw">from</span> <span class="str">'cors'</span>
+<span class="kw">import</span> { courses, createCourseId } <span class="kw">from</span> <span class="str">'./courses.js'</span>
+
+<span class="kw">const</span> app = <span class="fn">express</span>()
+app.<span class="fn">use</span>(<span class="fn">cors</span>()) <span class="cmt">// 1. CORS — cho frontend gọi từ domain khác</span>
+app.<span class="fn">use</span>(<span class="fn">express.json</span>()) <span class="cmt">// 2. đọc body JSON</span>
+
+<span class="cmt">// 3. Middleware log tự viết — chạy cho MỌI request</span>
+app.<span class="fn">use</span>((req: Request, res: Response, next: NextFunction) => {
+  console.<span class="fn">log</span>(`[${<span class="kw">new</span> <span class="fn">Date</span>().<span class="fn">toISOString</span>()}] ${req.method} ${req.url}`)
+  <span class="fn">next</span>()
+})
+
+<span class="cmt">// ——— Các route giữ nguyên từ bài 10 ———</span>
+app.<span class="fn">get</span>(<span class="str">'/api/courses'</span>, (req: Request, res: Response) => { <span class="cmt">/* ... */</span> })
+app.<span class="fn">get</span>(<span class="str">'/api/courses/:id'</span>, (req: Request, res: Response) => { <span class="cmt">/* ... */</span> })
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, (req: Request, res: Response) => { <span class="cmt">/* ... */</span> })
+
+<span class="cmt">// Route test lỗi — xóa sau khi verify</span>
+app.<span class="fn">get</span>(<span class="str">'/api/boom'</span>, () => {
+  <span class="kw">throw</span> <span class="kw">new</span> <span class="fn">Error</span>(<span class="str">'Có lỗi xảy ra!'</span>)
+})
+
+<span class="cmt">// Error-handling middleware — 4 tham số, đặt SAU CÙNG</span>
+app.<span class="fn">use</span>((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.<span class="fn">error</span>(<span class="str">'Lỗi:'</span>, err.message)
+  res.<span class="fn">status</span>(<span class="num">500</span>).<span class="fn">json</span>({ error: <span class="str">'Internal Server Error'</span> })
+})
+
+<span class="kw">const</span> PORT = <span class="fn">Number</span>(process.env.PORT ?? <span class="num">4000</span>)
+app.<span class="fn">listen</span>(PORT, () => {
+  console.<span class="fn">log</span>(`✅ Express running at http://localhost:${PORT}`)
+})</code></pre>
+  </div>
+
+  <h2>5. Chạy và verify</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 1 — chạy server</span>
+<pre><code><span class="tbl">npm</span> run dev</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 2 — curl 3 thứ mới</span>
+<pre><code><span class="cmt"># 1. Xem log middleware in ra trong Terminal 1 khi gọi API</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/courses
+
+<span class="cmt"># 2. Kiểm tra CORS header — phải thấy Access-Control-Allow-Origin</span>
+<span class="fn">curl</span> -s -D - -o /dev/null http://localhost:4000/api/courses | grep -i access-control
+
+<span class="cmt"># 3. Test error-handling — /api/boom trả JSON 500, không crash server</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/boom</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Kết quả đã kiểm chứng (Express 5.2.1, cors 2.8.6, Node v24.16.0)</div>
+    <p>Chạy bản verify tạm rồi curl: log middleware in ra <code>[2026-08-09T14:36:45.038Z] GET /api/courses</code> và <code>GET /api/boom</code>; header <code>Access-Control-Allow-Origin: *</code> xuất hiện; <code>/api/boom</code> trả <code>{"error":"Internal Server Error"}</code> kèm dòng <code>Lỗi: Có lỗi xảy ra!</code> trong terminal — server vẫn sống, không crash.</p>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Tự viết middleware log <code>(req, res, next)</code> — hiểu vì sao phải gọi <code>next()</code> và vì sao đặt trước route</li>
+      <li>Hiểu error-handling middleware 4 tham số <code>(err, req, res, next)</code> — chống crash, trả JSON 500</li>
+      <li>Bật CORS bằng <code>app.use(cors())</code> — frontend gọi API được từ domain khác</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Middleware log của bạn quên gọi <code>next()</code>. Điều gì xảy ra?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — không gọi next() thì request không đi tiếp, không tới route handler.">A. Request vẫn tới route handler bình thường</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Docs: 'If the current middleware function does not end the request-response cycle, it must call next()... Otherwise, the request will be left hanging.' — client chờ mãi, không nhận response.">B. Request bị treo — client chờ mãi không nhận response</button>
+    <button class="opt" data-correct="false" data-explain="Sai — không gọi next() không ném lỗi; nó chỉ làm request dừng lại ở middleware đó.">C. Express tự ném lỗi 500</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Làm sao Express nhận biết một middleware là error-handling middleware?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — tên hàm không quan trọng; Express không dựa vào tên.">A. Tên hàm phải bắt đầu bằng "error"</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Express nhận biết bằng SỐ THAM SỐ: đúng 4 tham số (err, req, res, next) = error-handler; 3 tham số (req, res, next) = middleware thường.">B. Có đúng 4 tham số <code>(err, req, res, next)</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — phải có đủ 4 tham số, thiếu err thì thành middleware thường.">C. Có 3 tham số <code>(req, res, next)</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao <code>app.use(cors())</code> nên đặt ĐẦU TIÊN, trước cả error-handler?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Header CORS phải có trong MỌI response kể cả response lỗi — đặt đầu tiên đảm bảo cors() chạy trước mọi thứ, nên response nào cũng có header CORS.">A. Để header CORS có mặt trong mọi response, kể cả response lỗi</button>
+    <button class="opt" data-correct="false" data-explain="Sai — cors() không liên quan tới tốc độ; mục đích là phủ mọi response.">B. Để server chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — cors() không đọc body; express.json() mới đọc body.">C. Để cors() đọc được body trước express.json()</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>6. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã có server Express với log, error-handling, CORS — nhưng dữ liệu vẫn nằm trong mảng <code>courses</code> trong bộ nhớ: mất khi restart, không truy vấn được, không an toàn. Mọi hệ thống thật cần <strong>database</strong>. Bài 12 bạn sẽ kết nối PostgreSQL (chạy bằng Docker) và viết SQL thật — CRUD users. Câu hỏi: dữ liệu nên lưu ở đâu để không mất khi server restart?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 12 · Kết nối PostgreSQL (pg) — SQL thật, CRUD users</div>
+    <p class="nd">Bật PostgreSQL bằng Docker, cài thư viện pg, viết SQL thật để lưu users — hết cảnh mất dữ liệu khi restart.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0010-express-co-ban.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Thêm 3 middleware vào <code>src/server.ts</code>, chạy <code>npm run dev</code>, curl 3 thứ (log, CORS header, /api/boom) và gửi tôi kết quả. Thử đổi chỗ <code>app.use(cors())</code> xuống sau route để tự thấy vì sao thứ tự quan trọng. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
