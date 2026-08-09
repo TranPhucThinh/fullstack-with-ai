@@ -14,5 +14,9 @@ build/
 .settings/
 *.local.json
 
+# File phát sinh khi chạy demo bài 08 (file giả 2MB + bản sao viết hoa)
+elearning-backend/demo/SW.js
+elearning-backend/demo/copy.txt
+
 # Hệ điều hành
 .DS_Store

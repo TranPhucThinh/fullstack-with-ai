@@ -112,7 +112,7 @@ const server = createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Route not found' })
 })
 
-const PORT = 4000 // cổng mặc định — đổi được khi cần
+const PORT = Number(process.env.PORT ?? 4000) // cổng mặc định — đổi được khi cần
 const HOST = '0.0.0.0' // lắng nghe mọi kết nối, không chỉ localhost
 
 // Bật server, in ra URL để mở trình duyệt

@@ -25,3 +25,10 @@
 - `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
+## Đang làm việc — Bài 09 (vì sao cần framework? Express)
+
+- ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
+- Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
+- Điểm yếu cần theo dõi: chưa có thực hành xử lý lỗi stream (sự kiện `error`/`pipeline()`) — sẽ gặp khi bài upload file.
+- Tiếp theo: soạn `lessons/0009-vi-sao-can-framework.html` (bài cầu nối Express) — đối chiếu routing table/query/body/env đã tự xây với thứ Express đóng gói sẵn.
+- Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).

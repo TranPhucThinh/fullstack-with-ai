@@ -39,3 +39,17 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **status 400 Bad Request** | Mã lỗi client gửi request không hợp lệ — server từ chối xử lý, không tạo dữ liệu | 07 |
 | **status 404 Not Found** | Mã lỗi tài nguyên không tồn tại — trả về khi GET id không có trong dữ liệu | 07 |
 | **status 201 Created** | Mã thành công khi tạo mới resource — kèm body chứa object vừa tạo | 07 |
+| **fs/promises** | API đọc/ghi file theo phong cách Promise (dùng await) — một trong 3 phong cách fs: promises, callback, sync | 08 |
+| **Buffer** | Kiểu dữ liệu Node chứa byte nhị phân — `readFile` không kèm encoding trả về Buffer thay vì string | 08 |
+| **import.meta.url** | URL của chính module đang chạy — kết hợp `fileURLToPath` + `path.join` để định vị file tương đối với code thay vì cwd | 08 |
+| **ENOENT** | Mã lỗi "file không tồn tại" (Error NO ENTry) — `fs/promises` reject Promise với lỗi này; luôn try/catch quanh fs bất đồng bộ | 08 |
+| **stream** | Cơ chế Node truyền dữ liệu từng phần (chunk) thay vì nạp cả khối — 4 loại: Readable, Writable, Duplex, Transform | 08 |
+| **Readable stream** | Nguồn dữ liệu — đọc ra từng chunk; ví dụ `fs.createReadStream`, `req` (IncomingMessage), `process.stdin` | 08 |
+| **Writable stream** | Đích dữ liệu — ghi vào; ví dụ `res` (ServerResponse), `fs.createWriteStream`, `process.stdout` | 08 |
+| **highWaterMark** | Ngưỡng bộ đệm của stream (mặc định 64KB với createReadStream) — quyết định cỡ mỗi chunk; là threshold, không phải limit | 08 |
+| **pipe()** | Nối stream đọc với stream ghi — dữ liệu chảy dần, không nạp hết vào RAM; ví dụ `readStream.pipe(res)` | 08 |
+| **process.env** | Object chứa biến môi trường của tiến trình — tách cấu hình khỏi code: cùng một code, nhiều môi trường | 08 |
+| **process.argv** | Mảng tham số dòng lệnh — phần tử 0 là đường dẫn node, 1 là file script, còn lại là tham số | 08 |
+| **process.exitCode** | Mã thoát để shell biết thành công (0) hay thất bại (≠0) — đặt thay vì gọi `process.exit()` để stdout flush kịp | 08 |
+| **EADDRINUSE** | Lỗi "địa chỉ đang được dùng" khi cổng đã bị tiến trình khác chiếm — xử lý: đổi cổng hoặc dừng tiến trình cũ | 08 |
+| **`.env`** | File lưu biến môi trường local của dự án — không commit lên git; đây là nơi đặt PORT, secret, URL database | 08 |
