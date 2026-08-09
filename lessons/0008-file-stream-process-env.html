@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 08 · File system, streams, process, env</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 1 · Bài 08</span>
+  <h1>File system, streams, process, env</h1>
+  <p class="subtitle">Hiểu stream là gì, đọc ghi file với <code>fs</code>, và dùng <code>process.env</code> để cấu hình dự án — những mảnh ghép Node nằm ngay dưới framework.</p>
+  <p class="meta-line">⏱ ~75 phút · 🎯 Mục tiêu: viết được demo đọc/ghi file bằng fs/promises, đọc file qua stream, trả file qua HTTP bằng pipe, và cấu hình server bằng biến môi trường thay vì hardcode.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 07 bạn đã thấy <code>for await (const chunk of req)</code> — đọc body request theo từng <em>chunk</em>. Bài này trả lời vì sao dữ liệu tới theo chunk chứ không phải một cục lớn, và mở rộng sang <strong>file</strong>: Node ⇄ file cũng là một dòng chảy dữ liệu như Node ⇄ HTTP. Bạn sẽ thấy <code>req</code>/<code>res</code>, <code>readFile</code>, <code>createReadStream</code> đều xoay quanh một thứ: <strong>stream</strong>.</p>
+  </div>
+
+  <h2>1. Ba cách đọc file trong Node</h2>
+  <p>Trước khi mổ stream, cần biết Node có 3 phong cách API cho mọi thao tác fs (theo <a href="https://nodejs.org/docs/latest-v24.x/api/fs.html" target="_blank">tài liệu chính thức Node.js</a>):</p>
+
+  <table class="data">
+    <thead><tr><th>Phong cách</th><th>Đặc điểm</th><th>Khi nào dùng</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Promises</strong> (<code>fs/promises</code>)</td><td>Trả Promise, dùng <code>await</code> được</td><td>Mặc định cho code mới — ví dụ trong bài này</td></tr>
+      <tr><td><strong>Callback</strong> (<code>fs</code>)</td><td>Nhận callback <code>(err, data) =&gt; ...</code></td><td>Khi cần hiệu năng tối đa về allocation</td></tr>
+      <tr><td><strong>Sync</strong> (<code>fsSync</code>)</td><td>Chặn event loop tới khi xong</td><td>Chỉ ở khởi động/script CLI ngắn</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo docs, <code>readFile</code> đọc <strong>toàn bộ nội dung file</strong> vào bộ nhớ — nếu không chỉ <code>encoding</code>, dữ liệu trả về là <code>Buffer</code>. Khi dùng <code>{ encoding: 'utf8' }</code> thì là string.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Đọc cả file: dễ nhưng phải đúng cỡ</div>
+    <p><code>readFile</code> rất tiện cho file cấu hình, JSON nhỏ. Nhưng với file 2GB, nạp cả vào RAM là sai lầm — bài toán của stream bắt đầu từ đây.</p>
+  </div>
+
+  <h2>2. Đọc/ghi file với fs/promises (demo 1)</h2>
+
+  <p>Trong thư mục <code>elearning-backend/demo/</code>, tạo file <code>demo-fs-read-write.mjs</code> (thư mục <code>demo/</code> đã tồn tại từ bài trước):</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-fs-read-write.mjs</span>
+<pre><code><span class="cmt">// Demo 1: fs/promises — đọc CẢ FILE vào bộ nhớ (dễ dùng, nhưng phải xứng cỡ file)</span>
+<span class="kw">import</span> { readFile, writeFile } <span class="kw">from</span> <span class="str">'node:fs/promises'</span>
+<span class="kw">import</span> { fileURLToPath } <span class="kw">from</span> <span class="str">'node:url'</span>
+<span class="kw">import</span> path <span class="kw">from</span> <span class="str">'node:path'</span>
+
+<span class="cmt">// import.meta.url trỏ tới file đang chạy — từ đó suy ra "cùng thư mục với file này"</span>
+<span class="kw">const</span> here = <span class="fn">fileURLToPath</span>(import.meta.url)
+<span class="kw">const</span> dataFile = path.<span class="fn">join</span>(path.<span class="fn">dirname</span>(here), <span class="str">'data.txt'</span>)
+
+<span class="kw">const</span> content = <span class="kw">await</span> <span class="fn">readFile</span>(dataFile, <span class="str">'utf8'</span>)
+console.<span class="fn">log</span>(<span class="str">'Nội dung file:'</span>, content)
+
+<span class="kw">await</span> <span class="fn">writeFile</span>(path.<span class="fn">join</span>(path.<span class="fn">dirname</span>(here), <span class="str">'copy.txt'</span>), content.<span class="fn">toUpperCase</span>())
+console.<span class="fn">log</span>(<span class="str">'Đã ghi copy.txt (viết hoa)'</span>)</code></pre>
+  </div>
+
+  <p>Tạo file dữ liệu cùng thư mục:</p>
+  <div class="code-block">
+    <span class="code-label">demo/data.txt</span>
+<pre><code><span class="cmt"># File dữ liệu cho demo fs</span>
+Hello from data.txt
+nodejs 24</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 1</span>
+<pre><code><span class="cmt"># Từ thư mục elearning-backend/</span>
+<span class="fn">node</span> demo/demo-fs-read-write.mjs</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (Node v24.16.0)</div>
+    <p>Chạy xong in ra nội dung file, tạo <code>copy.txt</code> viết hoa toàn bộ. Kiểu đường dẫn <code>fileURLToPath(import.meta.url)</code> giúp script chạy đúng dù bạn gọi từ thư mục khác.</p>
+  </div>
+
+  <p><code>import.meta.url</code> là URL của chính module đang chạy — <code>file:///...demo/demo-fs-read-write.mjs</code>. <code>fileURLToPath</code> biến nó thành đường dẫn hệ thống, từ đó <code>path.join(dirname(...), 'data.txt')</code> ra file ngay cạnh script. Đây là cách đúng để định vị file tương đối với code, thay vì phụ thuộc thư mục bạn đang đứng khi gõ lệnh.</p>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Cẩn thận khi gọi lệnh</div>
+    <p><code>readFile('./data.txt')</code> tương đối với <strong>thư mục bạn đang đứng trong terminal</strong> (cwd), không phải vị trí file script. Chạy từ <code>elearning-backend/</code> mà viết <code>'data.txt'</code> thẳng sẽ báo <code>ENOENT</code>. Lưu ý này đúng với mọi API fs nhận đường dẫn.</p>
+  </div>
+
+  <h2>3. Stream là gì — vì sao dữ liệu tới theo chunk</h2>
+
+  <p>Theo <a href="https://nodejs.org/docs/latest-v24.x/api/stream.html" target="_blank">tài liệu chính thức</a>, Node có 4 loại stream:</p>
+
+  <table class="data">
+    <thead><tr><th>Loại</th><th>Bản chất</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Readable</strong></td><td>Nguồn dữ liệu — đọc ra</td><td><code>fs.createReadStream</code>, <code>req</code>, <code>process.stdin</code></td></tr>
+      <tr><td><strong>Writable</strong></td><td>Đích dữ liệu — ghi vào</td><td><code>fs.createWriteStream</code>, <code>res</code>, <code>process.stdout</code></td></tr>
+      <tr><td><strong>Duplex</strong></td><td>Vừa đọc vừa ghi</td><td><code>net.Socket</code> (TCP)</td></tr>
+      <tr><td><strong>Transform</strong></td><td>Duplex có biến đổi dữ liệu</td><td><code>zlib.createGzip</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>Key insight: <code>req</code> và <code>res</code> bạn dùng ở bài 06-07 <strong>chính là stream</strong>. Docs viết rõ: <em>"<code>req</code> là http.IncomingMessage — một readable stream; <code>res</code> là http.ServerResponse — một writable stream"</em>. Stream là cách Node truyền dữ liệu <strong>từng phần (chunk)</strong> thay vì chờ đủ cả khối — giống vòi nước chứ không phải thùng nước.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao chunk?</div>
+    <p>Dữ liệu (file, mạng, socket) không tới một lúc. Server đọc file 2GB từ đĩa: nếu chờ đủ 2GB mới xử lý, bạn tốn 2GB RAM và client chờ rất lâu. Stream cho phép <strong>xử lý và trả về ngay khi có phần đầu tiên</strong> — giảm bộ nhớ, giảm độ trễ, và nối được nguồn chậm với đích nhanh.</p>
+  </div>
+
+  <p>Kích thước mỗi chunk do <code>highWaterMark</code> quyết định: mức "ngưỡng" bộ đệm trước khi stream tạm dừng xin thêm dữ liệu. Với <code>fs.createReadStream</code>, mặc định là <code>64 * 1024</code> bytes (= 64KB). Đây không phải giới hạn cứng — là <strong>threshold, không phải limit</strong>, theo docs.</p>
+
+  <h2>4. Đọc file theo stream (demo 2 — thấy chunk bằng mắt)</h2>
+
+  <p>Tạo file giả 2MB trong <code>demo/</code> rồi viết demo đọc:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — tạo file giả 2MB</span>
+<pre><code><span class="cmt"># Từ elearning-backend/ — tạo file giả 2MB (dùng cho demo stream)</span>
+<span class="fn">dd</span> if=/dev/urandom of=demo/SW.js bs=1024 count=2048</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-stream-chunks.mjs</span>
+<pre><code><span class="cmt">// Demo 2: stream Readable — đọc theo CHUNK (phù hợp file lớn, không cần nạp hết vào RAM)</span>
+<span class="kw">import</span> { createReadStream } <span class="kw">from</span> <span class="str">'node:fs'</span>
+
+<span class="cmt">// highWaterMark: 64KB mặc định (bài học: cỡ chunk do mình chọn)</span>
+<span class="kw">const</span> stream = <span class="fn">createReadStream</span>(<span class="str">'SW.js'</span>, { highWaterMark: <span class="num">64</span> * <span class="num">1024</span> })
+
+<span class="kw">let</span> chunkIndex = <span class="num">0</span>
+<span class="kw">let</span> totalBytes = <span class="num">0</span>
+
+<span class="cmt">// 'data' event: mỗi lần có chunk sẵn sàng thì callback chạy</span>
+stream.<span class="fn">on</span>(<span class="str">'data'</span>, (chunk) =&gt; {
+  chunkIndex++
+  totalBytes += chunk.length
+  console.<span class="fn">log</span>(`chunk ${chunkIndex}: ${chunk.length} bytes`)
+})
+
+<span class="cmt">// 'end' event: đã đọc xong toàn bộ file</span>
+stream.<span class="fn">on</span>(<span class="str">'end'</span>, () =&gt; {
+  console.<span class="fn">log</span>(`Xong! Tổng ${totalBytes} bytes qua ${chunkIndex} chunks`)
+})</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 2</span>
+<pre><code><span class="fn">node</span> demo/demo-stream-chunks.mjs</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Kết quả đã kiểm chứng (Node v24.16.0)</div>
+    <p>Trong thư mục <code>demo/</code>, chạy <code>node demo-stream-chunks.mjs</code>: 2MB đọc thành <strong>32 chunk × 65536 bytes</strong>, tổng <code>2097152</code> bytes. Nếu tăng <code>highWaterMark</code> lên 1MB, số chunk giảm còn 2 — chunk to hơn thì tốn RAM hơn nhưng ít lần đọc hơn. Đây là đánh đổi bạn sẽ gặp khi tinh chỉnh.</p>
+  </div>
+
+  <h2>5. Trả file qua HTTP bằng pipe (demo 3 — chạm tới dự án thật)</h2>
+
+  <p>Demo 2 mới chỉ đọc. Giờ nối stream đọc file với stream ghi HTTP: <code>readStream.pipe(res)</code>. Dữ liệu chảy từ file vào response, không nạp cả file vào RAM.</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-http-stream.mjs</span>
+<pre><code><span class="cmt">// Demo 3: HTTP server + stream — không nạp hết file vào RAM, vừa đọc vừa trả</span>
+<span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'node:http'</span>
+<span class="kw">import</span> { createReadStream } <span class="kw">from</span> <span class="str">'node:fs'</span>
+<span class="kw">import</span> { stat } <span class="kw">from</span> <span class="str">'node:fs/promises'</span>
+<span class="kw">import</span> { join, dirname } <span class="kw">from</span> <span class="str">'node:path'</span>
+<span class="kw">import</span> { fileURLToPath } <span class="kw">from</span> <span class="str">'node:url'</span>
+
+<span class="kw">const</span> here = <span class="fn">dirname</span>(<span class="fn">fileURLToPath</span>(import.meta.url)) <span class="cmt">// thư mục chứa file này</span>
+<span class="kw">const</span> server = <span class="fn">createServer</span>(<span class="kw">async</span> (req, res) =&gt; {
+  <span class="cmt">// Chỉ phục vụ đúng route /download</span>
+  <span class="kw">if</span> (req.method !== <span class="str">'GET'</span> || req.url !== <span class="str">'/download'</span>) {
+    res.<span class="fn">writeHead</span>(<span class="num">404</span>, { <span class="str">'Content-Type'</span>: <span class="str">'text/plain; charset=utf-8'</span> })
+    res.<span class="fn">end</span>(<span class="str">'Không tìm thấy'</span>)
+    <span class="kw">return</span>
+  }
+
+  <span class="kw">const</span> filePath = <span class="fn">join</span>(here, <span class="str">'SW.js'</span>) <span class="cmt">// chính file giả 2MB trong demo</span>
+  <span class="kw">const</span> { size } = <span class="kw">await</span> <span class="fn">stat</span>(filePath) <span class="cmt">// lấy kích thước file</span>
+
+  <span class="cmt">// Gửi header Content-Length TRƯỚC — client biết chính xác độ dài tải về</span>
+  res.<span class="fn">writeHead</span>(<span class="num">200</span>, {
+    <span class="str">'Content-Type'</span>: <span class="str">'text/javascript; charset=utf-8'</span>,
+    <span class="str">'Content-Length'</span>: size,
+  })
+
+  <span class="cmt">// Nối stream đọc file với response — dữ liệu chảy dần, không giữ 2MB trong RAM</span>
+  <span class="kw">const</span> readStream = <span class="fn">createReadStream</span>(filePath)
+  readStream.<span class="fn">pipe</span>(res)
+})
+
+<span class="kw">const</span> PORT = <span class="num">4012</span>
+server.<span class="fn">listen</span>(PORT, () =&gt; console.<span class="fn">log</span>(`Server stream: http://localhost:${PORT}/download`))</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 3 & kiểm tra</span>
+<pre><code><span class="fn">node</span> demo/demo-http-stream.mjs</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 2 — curl</span>
+<pre><code><span class="fn">curl</span> -s -o /dev/null -D - http://localhost:4012/download
+<span class="cmt"># HTTP/1.1 200 OK</span>
+<span class="cmt"># Content-Length: 2097152</span>
+<span class="cmt"># ...</span>
+
+<span class="cmt"># Lưu file tải về và so kích thước với bản gốc</span>
+<span class="fn">curl</span> -s http://localhost:4012/download -o /tmp/downloaded-SW.js
+<span class="fn">ls</span> -l /tmp/downloaded-SW.js demo/SW.js</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao phải set Content-Length?</div>
+    <p>Nếu không set, client không biết khi nào file hết — với connection keep-alive, client sẽ chờ tới timeout. <code>pipe</code> tự gọi <code>end()</code> khi stream đọc xong, nhưng header phải có từ trước. Node có thể trả theo <code>Transfer-Encoding: chunked</code> nếu bạn không set Content-Length — đúng hơn cho stream, nhưng với file có kích thước biết trước thì Content-Length chuẩn hơn.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Demo 3 là code học — chưa phải production</div>
+    <p>Trong demo, đường dẫn file nằm cứng trong code và không hạn chế loại file — ai gọi <code>/download</code> cũng lấy được <code>SW.js</code>. Khi làm thật sẽ đọc <code>path.join(here, ...)</code> từ env, kiểm tra <code>..</code> để chống path traversal. Đó là nội dung bài bảo mật sau này.</p>
+  </div>
+
+  <h2>6. process & env — cấu hình không hardcode</h2>
+
+  <p>Theo <a href="https://nodejs.org/docs/latest-v24.x/api/process.html" target="_blank">tài liệu process</a>, mỗi tiến trình Node có sẵn:</p>
+
+  <table class="data">
+    <thead><tr><th>Thuộc tính</th><th>Ý nghĩa</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td><code>process.argv</code></td><td>Mảng tham số dòng lệnh — phần tử 0 là đường dẫn node, 1 là file script, còn lại là tham số</td><td><code>node a.mjs x y</code> → <code>['/usr/local/bin/node', '/path/a.mjs', 'x', 'y']</code></td></tr>
+      <tr><td><code>process.cwd()</code></td><td>Thư mục hiện tại khi khởi động tiến trình</td><td><code>/Users/you/project</code></td></tr>
+      <tr><td><code>process.env</code></td><td>Object chứa biến môi trường của tiến trình</td><td><code>{ NODE_ENV: 'production', ... }</code></td></tr>
+      <tr><td><code>process.exitCode</code></td><td>Mã thoát để shell biết thành công (0) hay lỗi (≠0)</td><td>đặt <code>1</code> khi thiếu config</td></tr>
+    </tbody>
+  </table>
+
+  <p>Trong demo 4, ta in ra 4 thứ đó, rồi chạy lại với biến môi trường:</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-process-env.mjs</span>
+<pre><code><span class="cmt">// Demo 4: process + env — argv, cwd, env, exit code</span>
+console.<span class="fn">log</span>(<span class="str">'argv ='</span>, process.argv)
+console.<span class="fn">log</span>(<span class="str">'cwd  ='</span>, process.<span class="fn">cwd</span>())
+console.<span class="fn">log</span>(<span class="str">'NODE_ENV ='</span>, process.env.NODE_ENV ?? <span class="str">'(chưa đặt)'</span>)
+console.<span class="fn">log</span>(<span class="str">'SELF_PORT ='</span>, process.env.SELF_PORT ?? <span class="str">'(chưa đặt)'</span>)</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 4</span>
+<pre><code><span class="cmt"># Từ elearning-backend/</span>
+<span class="fn">node</span> demo/demo-process-env.mjs one two=three
+
+<span class="cmt"># Đặt biến môi trường ngay trước lệnh — chỉ tồn tại trong lần chạy này</span>
+<span class="fn">NODE_ENV</span>=production SELF_PORT=<span class="num">4012</span> <span class="fn">node</span> demo/demo-process-env.mjs</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (Node v24.16.0)</div>
+    <p>Lần đầu: <code>argv</code> gồm đường dẫn node, file script, rồi <code>'one'</code>, <code>'two=three'</code>; <code>NODE_ENV</code> trả về <code>(chưa đặt)</code>. Lần hai: <code>NODE_ENV=production</code>, <code>SELF_PORT=4012</code> xuất hiện trong <code>process.env</code>.</p>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng env?</div>
+    <p>Cổng, URL database, secret... khác nhau giữa máy local và production. Hardcode trong code khiến bạn phải sửa file khi triển khai — và rò rỉ secret vào git. <code>process.env</code> cho phép <strong>cùng một code, nhiều môi trường</strong>: shell quyết định, code chỉ đọc. Đây là lý do mọi framework (Express đọc <code>process.env.PORT</code>, NestJS dùng ConfigModule) đều dựa trên env.</p>
+  </div>
+
+  <h2>7. exit code — cho shell biết lệnh thành công hay thất bại</h2>
+
+  <p>Khi server cấu hình thiếu, ta không muốn chạy tiếp với giá trị sai. Demo 5 đặt <code>process.exitCode = 1</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-exit-code.mjs</span>
+<pre><code><span class="cmt">// Demo 5: exit code — process.exitCode để shell biết lệnh thành công hay thất bại</span>
+<span class="kw">import</span> process <span class="kw">from</span> <span class="str">'node:process'</span>
+
+<span class="kw">const</span> required = process.env.REQUIRED_FLAG <span class="cmt">// biến tùy chọn cần có</span>
+
+<span class="kw">if</span> (!required) {
+  console.<span class="fn">error</span>(<span class="str">'Thiếu REQUIRED_FLAG — không chạy được'</span>)
+  process.exitCode = <span class="num">1</span> <span class="cmt">// KHÔNG gọi process.exit() — để stdout/stderr được flush</span>
+} <span class="kw">else</span> {
+  console.<span class="fn">log</span>(`Nhận được flag: ${required}`)
+}</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 5</span>
+<pre><code><span class="cmt"># Thiếu biến — lệnh "thất bại", shell thấy exit code 1</span>
+<span class="fn">node</span> demo/demo-exit-code.mjs
+<span class="fn">echo</span> $?
+
+<span class="cmt"># Đủ biến — thành công, exit 0</span>
+<span class="fn">REQUIRED_FLAG</span>=abc <span class="fn">node</span> demo/demo-exit-code.mjs
+<span class="fn">echo</span> $?</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Không lạm dụng process.exit()</div>
+    <p>Docs cảnh báo: gọi <code>process.exit()</code> ép tiến trình thoát ngay, có thể cắt mất dữ liệu stdout đang được ghi bất đồng bộ. Thay vì thế, <strong>đặt <code>process.exitCode</code> rồi để tiến trình thoát tự nhiên</strong> khi không còn việc gì trong event loop.</p>
+  </div>
+
+  <h2>8. Bắt lỗi file không tồn tại (demo 6 — chống crash)</h2>
+
+  <p>Đọc file vắng mặt sẽ reject với <code>ENOENT</code>. Nếu không bắt, tiến trình không tải được. Hãy luôn <code>try/catch</code> quanh fs ở code bất đồng bộ:</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/demo-error.mjs</span>
+<pre><code><span class="cmt">// Demo 6: bắt lỗi ENOENT — đọc file không tồn tại nhưng KHÔNG crash</span>
+<span class="kw">import</span> { readFile } <span class="kw">from</span> <span class="str">'node:fs/promises'</span>
+
+<span class="kw">try</span> {
+  <span class="kw">await</span> <span class="fn">readFile</span>(<span class="str">'./khong-ton-tai.txt'</span>, <span class="str">'utf8'</span>)
+} <span class="kw">catch</span> (err) {
+  console.<span class="fn">log</span>(<span class="str">'Bắt được lỗi, code:'</span>, err.code)
+  console.<span class="fn">log</span>(<span class="str">'Thông điệp:'</span>, err.message)
+}
+console.<span class="fn">log</span>(<span class="str">'Chương trình vẫn chạy tiếp tới dòng này ✅'</span>)</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — chạy demo 6</span>
+<pre><code><span class="fn">node</span> demo/demo-error.mjs</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Đã kiểm chứng (Node v24.16.0)</div>
+    <p>In ra <code>code: ENOENT</code>, <code>message: ENOENT: no such file...'</code>, rồi dòng tiếp tục chạy bình thường, exit 0. Không crash.</p>
+  </div>
+
+  <h2>9. Ghép lại dự án: cấu hình PORT bằng env</h2>
+
+  <p>Giờ apply vào dự án thật: thay <code>const PORT = 4000</code> cứng trong <code>src/server.ts</code> bằng env (code hiện có của bạn cũng được — ý tưởng là đọc từ <code>process.env</code>):</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — phần cuối (chỉ sửa 2 dòng)</span>
+<pre><code><span class="cmt">// PORT đọc từ env: chạy "PORT=5000 npm run dev" sẽ lắng nghe 5000, mặc định 4000</span>
+<span class="kw">const</span> PORT = <span class="fn">Number</span>(process.env.PORT ?? <span class="num">4000</span>)
+<span class="kw">const</span> HOST = <span class="str">'0.0.0.0'</span>
+
+server.<span class="fn">listen</span>(PORT, HOST, () =&gt; {
+  console.<span class="fn">log</span>(`✅ Server running at http://localhost:${PORT}`)
+})</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — kiểm tra</span>
+<pre><code><span class="cmt"># Vẫn chạy mặc định 4000</span>
+<span class="tbl">npm</span> run dev
+
+<span class="cmt"># Hoặc ép cổng khác — cùng code, cổng khác</span>
+<span class="tbl">PORT</span>=<span class="num">5000</span> <span class="tbl">npm</span> run dev
+<span class="fn">curl</span> -s http://localhost:5000/api/courses | head -c 120
+<span class="fn">echo</span> <span class="str">''</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Đọc/ghi file bằng <code>fs/promises</code> (readFile/writeFile) với đường dẫn bền vững qua <code>import.meta.url</code></li>
+      <li>Hiểu stream: Readable/Writable, <code>highWaterMark</code>, dữ liệu chảy theo chunk</li>
+      <li>Trả file qua HTTP bằng <code>readStream.pipe(res)</code> + Content-Length — không nạp cả file vào RAM</li>
+      <li>Dùng <code>process.argv</code>/<code>cwd()</code>/<code>env</code>/<code>exitCode</code>, và cấu hình PORT bằng env thay vì hardcode</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. <code>req</code> và <code>res</code> trong node:http thuộc loại stream nào?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai đều là stream; khác loại. req là readable, res là writable.">A. Đều là Readable</button>
+    <button class="opt" data-correct="false" data-explain="Sai — req là readable (đọc body), res là writable (ghi response).">B. Đều là Writable</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! req extends IncomingMessage (Readable — đọc dữ liệu từ client), res extends ServerResponse (Writable — ghi dữ liệu về client).">C. req là Readable, res là Writable</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. File 2MB, <code>highWaterMark: 64 * 1024</code>. Vì sao stream đọc ra nhiều chunk thay vì một cục 2MB?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! highWaterMark là ngưỡng bộ đệm 64KB — stream đọc tới khi đủ ngưỡng, xử lý, rồi đọc tiếp. Giảm RAM và cho phép xử lý ngay từ phần đầu.">A. highWaterMark là ngưỡng bộ đệm: mỗi lần đọc tối đa ~64KB rồi dừng chờ tiêu thụ, giúp không nạp cả file vào RAM</button>
+    <button class="opt" data-correct="false" data-explain="Sai — stream không nạp cả file; chính nhờ chia nhỏ mới giảm RAM.">B. Node gộp toàn bộ file vào một buffer duy nhất mỗi lần đọc</button>
+    <button class="opt" data-correct="false" data-explain="Sai — chunk là thuộc tính cố hữu của stream, không phải lỗi; việc chia nhỏ là có chủ đích.">C. File bị hỏng nên phải chia nhiều mảnh</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao <code>PORT</code> nên đọc từ <code>process.env.PORT ?? 4000</code> thay vì hardcode <code>const PORT = 4000</code>?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! 'Cùng một code, nhiều môi trường': local 4000, production 8080/random của cloud — không sửa file, không lộ secret.">A. Cho phép cùng một code chạy với cấu hình khác nhau mà không cần sửa code</button>
+    <button class="opt" data-correct="false" data-explain="Sai — env không làm code nhanh hơn; mục đích là tách cấu hình khỏi code.">B. Env làm code chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — ngược lại, tách cấu hình khỏi code giúp không lộ secret ra git; env có thể bị đọc bởi tiến trình cùng user nhưng đó là vấn đề quyền, không phải lý do tránh env.">C. Env kém an toàn hơn hardcode</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #4</h3>
+    <div class="q">Câu 4. Đọc file không tồn tại bằng <code>fs/promises</code>. Điều gì xảy ra nếu không bắt lỗi?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — fs/promises reject Promise chứ không trả null.">A. Trả về null</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Promise reject với lỗi ENOENT; không xử lý sẽ thành unhandled rejection — với code không bắt ở nơi khác, tiến trình có thể thoát với lỗi.">B. Promise reject với <code>Error.code = 'ENOENT'</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — callback không liên quan; đang dùng promises API.">C. Callback nhận <code>err = null</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>10. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã thấy stream xử lý dữ liệu tuần tự từng chunk. Nhưng khi request tới, server phải chạy nhiều bước <em>giữa chừng</em>: ghi log, kiểm tra auth, đọc body, rồi mới tới handler route. Làm sao tổ chức những bước dùng chung này cho mọi route mà không lặp code? Đó chính là <strong>middleware</strong> — khái niệm lõi của Express, và bài 09 nói về vì sao framework sinh ra để giải bài toán này.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 09 · Vì sao cần framework? Bài toán Express giải quyết</div>
+    <p class="nd">Nhìn lại routing table + body + query + env đã tự làm, rồi thấy Express đóng gói đúng những gì bạn vừa xây tay.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0007-request-response-thu-cong.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Tạo các demo file trong <code>demo/</code>, chạy từng file và gửi tôi output: (1) demo-fs-read-write: copy.txt viết hoa; (2) demo-stream-chunks: dòng tổng 2097152 bytes qua N chunks; (3) demo-http-stream: curl cho thấy Content-Length: 2097152; (4) demo-process-env: thấy NODE_ENV production; (5) demo-exit-code: exit 1 khi thiếu flag; (6) demo-error: bắt ENOENT không crash. Sau đó sửa server.ts đọc PORT từ env và gửi tôi lệnh <code>PORT=5000 npm run dev</code> + curl kết quả. Có gì chưa rõ về stream/fs/env, hỏi thoải mái.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
