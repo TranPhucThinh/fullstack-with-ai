@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 14 · Auth cơ bản bằng Express — bcrypt, JWT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 14</span>
+  <h1>Auth cơ bản bằng Express — bcrypt, JWT</h1>
+  <p class="subtitle">Đăng ký/đăng nhập với mật khẩu hash (bcrypt) và token (JWT) — xương sống bảo mật của mọi hệ thống.</p>
+  <p class="meta-line">⏱ ~90 phút · 🎯 Mục tiêu: hiểu vì sao phải hash mật khẩu, tạo register/login, bắt lỗi email trùng (409), và bảo vệ route bằng JWT middleware.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 12 bạn đã có CRUD users với PostgreSQL. Bài 13 bạn đã thiết kế database quan hệ. Nhưng hệ thống thật cần <strong>xác thực</strong>: ai được phép tạo khóa, ai mua khóa. Bài này giải bài toán: <strong>lưu mật khẩu an toàn thế nào</strong> (bcrypt) và <strong>chứng minh "tôi là ai" sau khi đăng nhập</strong> (JWT).</p>
+  </div>
+
+  <h2>1. Vì sao KHÔNG được lưu mật khẩu dạng thô?</h2>
+
+  <p>Nếu lưu mật khẩu dạng text trong database, một khi database bị rò rỉ (data breach), kẻ tấn công đọc được toàn bộ mật khẩu người dùng. Người dùng thường dùng lại mật khẩu ở nhiều nơi → hậu quả lan rộng.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Giải pháp: hash mật khẩu</div>
+    <p><strong>Hash</strong> là hàm một chiều: từ mật khẩu ra chuỗi hash dễ, nhưng từ hash không thể suy ngược ra mật khẩu. Khi đăng nhập, ta hash mật khẩu nhập vào rồi so sánh với hash đã lưu. Kẻ đánh cắp database chỉ có hash — vô dụng nếu hash đủ mạnh.</p>
+  </div>
+
+  <p>Theo <a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html" target="_blank">OWASP Password Storage Cheat Sheet</a>, mật khẩu phải được hash bằng thuật toán chậm, có salt (vd bcrypt, scrypt, argon2) — KHÔNG dùng MD5/SHA1 (quá nhanh, dễ brute-force). <strong>bcrypt</strong> là lựa chọn phổ biến nhất trong Node.</p>
+
+  <h2>2. bcrypt & JWT — xương sống auth</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — bcrypt hash & compare (đã verify XANH)</span>
+<pre><code><span class="cmt"># bcrypt@6.0.0, jsonwebtoken@9.0.3 đã cài trong dự án</span>
+<span class="tbl">node</span> -e <span class="str">"import('bcrypt').then(async b => {
+  const hash = await b.hash('secret123', 10)
+  console.log('hash:', hash)
+  console.log('compare dung:', await b.compare('secret123', hash))
+  console.log('compare sai:', await b.compare('sai', hash))
+})"</span></code></pre>
+  </div>
+
+  <p>Kết quả: hash là chuỗi dài (vd <code>$2b$10$...</code>), <code>compare</code> trả <code>true</code> với đúng mật khẩu, <code>false</code> với sai. Số <code>10</code> là <strong>cost factor</strong> — càng cao càng chậm (khó brute-force) nhưng tốn CPU.</p>
+
+  <p><strong>JWT (JSON Web Token)</strong> theo <a href="https://jwt.io/introduction" target="_blank">jwt.io</a> gồm 3 phần: <code>header.payload.signature</code>. Phần <strong>signature</strong> ký bằng secret — server verify được token có bị sửa.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — JWT sign & verify (đã verify XANH)</span>
+<pre><code><span class="tbl">node</span> -e <span class="str">"import('jsonwebtoken').then(jwt => {
+  const token = jwt.sign({ userId: 1 }, 'secret-demo', { expiresIn: '1h' })
+  console.log('token:', token)
+  console.log('verify:', jwt.verify(token, 'secret-demo'))
+  try { jwt.verify(token, 'sai-secret') } catch (e) { console.log('sai secret:', e.message) }
+})"</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao JWT quan trọng?</div>
+    <p>JWT cho phép server <strong>không cần lưu session</strong> (stateless): chỉ verify chữ ký bằng secret là biết token hợp lệ và payload chứa userId. Đây là nền cho mọi auth hiện đại, và NestJS sau này cũng dùng JWT.</p>
+  </div>
+
+  <h2>3. Thêm cột password_hash</h2>
+
+  <p>Bảng users hiện có id/email/name. Cần thêm cột lưu hash mật khẩu:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — ALTER TABLE</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;"</span></code></pre>
+  </div>
+
+  <h2>4. Viết auth vào server.ts</h2>
+
+  <p>Thêm import bcrypt + jwt ở đầu <code>src/server.ts</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm import</span>
+<pre><code><span class="kw">import</span> bcrypt <span class="kw">from</span> <span class="str">'bcrypt'</span>
+<span class="kw">import</span> jwt <span class="kw">from</span> <span class="str">'jsonwebtoken'</span>
+
+<span class="kw">const</span> JWT_SECRET = <span class="str">'secret-dev-doi-sau'</span> <span class="cmt">// ⚠️ bài sau học giấu vào .env</span></code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — register (hash + bắt 409)</span>
+<pre><code><span class="cmt">// Đăng ký: hash mật khẩu rồi lưu, trả token</span>
+app.post(<span class="str">'/api/auth/register'</span>, <span class="kw">async</span> (req, res) => {
+  <span class="kw">const</span> { email, name, password } = req.body ?? {}
+  <span class="kw">if</span> (!email || !name || !password) {
+    res.status(<span class="num">400</span>).json({ error: <span class="str">'email, name, password là bắt buộc'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> hash = <span class="kw">await</span> bcrypt.hash(password, <span class="num">10</span>)
+  <span class="kw">try</span> {
+    <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.query(
+      <span class="str">'INSERT INTO users (email, name, password_hash) VALUES ($1,$2,$3) RETURNING id, email, name'</span>,
+      [email, name, hash],
+    )
+    <span class="kw">const</span> token = jwt.sign({ userId: rows[<span class="num">0</span>].id }, JWT_SECRET, { expiresIn: <span class="str">'1h'</span> })
+    res.status(<span class="num">201</span>).json({ user: rows[<span class="num">0</span>], token })
+  } <span class="kw">catch</span> (e) {
+    <span class="kw">if</span> (e.code === <span class="str">'23505'</span>) {
+      res.status(<span class="num">409</span>).json({ error: <span class="str">'Email đã tồn tại'</span> })
+      <span class="kw">return</span>
+    }
+    <span class="kw">throw</span> e
+  }
+})</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Bắt lỗi 23505 — yếu điểm bài 12</div>
+    <p>Bài 12 ghi nhận email trùng → 500. Giờ bắt mã lỗi PostgreSQL <code>23505</code> (UNIQUE) và trả <code>409 Conflict</code> — đúng chuẩn REST.</p>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — login (compare + trả token)</span>
+<pre><code><span class="cmt">// Đăng nhập: tìm user theo email, so hash, trả token</span>
+app.post(<span class="str">'/api/auth/login'</span>, <span class="kw">async</span> (req, res) => {
+  <span class="kw">const</span> { email, password } = req.body ?? {}
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.query(<span class="str">'SELECT * FROM users WHERE email=$1'</span>, [email])
+  <span class="kw">if</span> (rows.length === <span class="num">0</span> || !(<span class="kw">await</span> bcrypt.compare(password, rows[<span class="num">0</span>].password_hash))) {
+    res.status(<span class="num">401</span>).json({ error: <span class="str">'Sai email hoặc mật khẩu'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> token = jwt.sign({ userId: rows[<span class="num">0</span>].id }, JWT_SECRET, { expiresIn: <span class="str">'1h'</span> })
+  res.json({ token })
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao trả 401 chung "Sai email hoặc mật khẩu"?</div>
+    <p>Nếu trả "Email không tồn tại" riêng, kẻ tấn công dò được email nào đã đăng ký (user enumeration). Trả chung một thông điệp mơ hồ là chuẩn bảo mật OWASP.</p>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — middleware auth + route /api/me</span>
+<pre><code><span class="cmt">// Middleware auth: đọc token, verify, gắn userId vào req</span>
+<span class="kw">function</span> auth(req, res, next) {
+  <span class="kw">const</span> header = req.headers.authorization
+  <span class="kw">if</span> (!header?.startsWith(<span class="str">'Bearer '</span>)) {
+    res.status(<span class="num">401</span>).json({ error: <span class="str">'Thiếu token'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">try</span> {
+    <span class="kw">const</span> decoded = jwt.verify(header.slice(<span class="num">7</span>), JWT_SECRET)
+    req.userId = decoded.userId <span class="cmt">// gắn userId cho handler dùng</span>
+    next()
+  } <span class="kw">catch</span> {
+    res.status(<span class="num">401</span>).json({ error: <span class="str">'Token không hợp lệ hoặc hết hạn'</span> })
+  }
+}
+
+<span class="cmt">// Route được bảo vệ: chỉ chạy khi token hợp lệ</span>
+app.get(<span class="str">'/api/me'</span>, auth, <span class="kw">async</span> (req, res) => {
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.query(<span class="str">'SELECT id, email, name FROM users WHERE id=$1'</span>, [req.userId])
+  res.json(rows[<span class="num">0</span>])
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Middleware auth — tái sử dụng</div>
+    <p>Middleware <code>auth</code> là hàm <code>(req, res, next)</code> — đúng pattern bài 11. Đặt trước bất kỳ route cần bảo vệ (vd sau này <code>app.post('/api/courses', auth, ...)</code>). Đây là tiền đề của <strong>guards</strong> trong NestJS.</p>
+  </div>
+
+  <h2>5. Test toàn bộ flow</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — test auth flow</span>
+<pre><code><span class="tbl">npm</span> run dev
+
+<span class="cmt"># 1. Đăng ký → 201 + token</span>
+<span class="tbl">curl</span> -X POST http://localhost:4000/api/auth/register \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"an@ex.com","name":"An","password":"secret123"}'</span>
+
+<span class="cmt"># 2. Đăng ký trùng email → 409</span>
+<span class="cmt"># 3. Đăng nhập đúng → token</span>
+<span class="cmt"># 4. Đăng nhập sai → 401</span>
+<span class="cmt"># 5. /api/me không token → 401</span>
+<span class="cmt"># 6. /api/me có token → 200 (dán token bước 3)</span>
+<span class="tbl">curl</span> http://localhost:4000/api/me -H <span class="str">"Authorization: Bearer <TOKEN>"</span></code></pre>
+  </div>
+
+  <h2>6. Tổng kết — bạn vừa đạt được</h2>
+
+  <ul class="checklist">
+    <li>Hiểu vì sao phải hash mật khẩu (bcrypt) — không lưu thô</li>
+    <li>Hiểu JWT — token ký bằng secret, stateless</li>
+    <li>Thêm cột password_hash vào bảng users</li>
+    <li>Viết register (hash + bắt 409), login (compare + trả token)</li>
+    <li>Viết middleware auth bảo vệ route /api/me</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao phải hash mật khẩu trước khi lưu?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Hash là hàm một chiều — nếu database bị rò rỉ, kẻ tấn công không đọc được mật khẩu gốc.">A. Để nếu database bị rò rỉ, mật khẩu gốc không lộ</button>
+    <button class="opt" data-correct="false" data-explain="Sai — hash không mã hóa để giải mã; nó là hàm một chiều.">B. Để mã hóa mật khẩu rồi giải mã khi cần</button>
+    <button class="opt" data-correct="false" data-explain="Sai — hash không làm mật khẩu ngắn hơn; bcrypt hash còn dài hơn.">C. Để mật khẩu ngắn gọn hơn khi lưu</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Khi đăng nhập, server làm gì để xác thực?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — không so sánh mật khẩu thô; so sánh hash.">B. So sánh mật khẩu nhập với mật khẩu lưu trong DB</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Hash mật khẩu nhập rồi so với hash đã lưu bằng bcrypt.compare.">A. Hash mật khẩu nhập rồi so với hash đã lưu (bcrypt.compare)</button>
+    <button class="opt" data-correct="false" data-explain="Sai — không giải mã hash; hash là một chiều.">C. Giải mã hash đã lưu rồi so với mật khẩu nhập</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Middleware auth trong bài làm gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — middleware không tạo token; nó verify token có sẵn.">B. Tạo token mới cho mỗi request</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Đọc token từ header, verify bằng secret, gắn userId vào req rồi next().">A. Đọc token từ header, verify, gắn userId vào req rồi next()</button>
+    <button class="opt" data-correct="false" data-explain="Sai — middleware không lưu session; JWT là stateless.">C. Lưu session của user vào database</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã có register/login và route /api/me được bảo vệ. Nhưng hệ thống thật cần nhiều hơn: <strong>đăng xuất</strong> (vô hiệu hóa token), <strong>refresh token</strong> (token hết hạn thì làm sao), <strong>quên mật khẩu</strong>. Bài 15 sẽ tổng kết toàn bộ Express — gom mọi thứ bạn đã học thành một e-learning chạy bằng Express thuần, trước khi chuyển sang TypeScript và NestJS.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 15 · Tổng kết Express — e-learning chạy bằng Express thuần</div>
+    <p class="nd">Gom toàn bộ: CRUD users, courses, enrollments, auth — thành một API e-learning hoàn chỉnh bằng Express.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0013-thiet-ke-database-elearning.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm theo bài: thêm cột password_hash, viết register/login/me vào server.ts, test đủ 6 case bằng curl, và gửi tôi output. Tôi sẽ kiểm tra bạn hiểu vì sao hash mật khẩu, vì sao trả 409/401, và middleware auth hoạt động thế nào. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
