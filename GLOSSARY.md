@@ -80,3 +80,13 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **RETURNING** | Mệnh đề SQL trả về dòng vừa thêm/sửa — dùng để lấy id (SERIAL) và dữ liệu mới ngay sau INSERT/UPDATE | 12 |
 | **rowCount** | Số dòng bị ảnh hưởng bởi query (vd DELETE) — dùng để biết có xóa được hay không (0 = không tồn tại) | 12 |
 | **error 23505** | Mã lỗi PostgreSQL vi phạm UNIQUE constraint (vd email trùng) — ứng dụng cần bắt và trả 409/400 thay vì 500 | 12 |
+| **ERD (Entity-Relationship Diagram)** | Bản vẽ các bảng và quan hệ giữa chúng — đọc trước khi viết SQL để hình dung rõ cấu trúc dữ liệu | 13 |
+| **normalization (chuẩn hóa)** | Tách dữ liệu thành nhiều bảng để mỗi dữ liệu lưu đúng một nơi — tránh trùng lặp (redundancy) và dị thường cập nhật (update anomaly) | 13 |
+| **quan hệ 1–1 (one-to-one)** | 1 dòng bảng A khớp đúng 1 dòng bảng B — biểu diễn bằng khóa ngoại + UNIQUE | 13 |
+| **quan hệ 1–nhiều (one-to-many)** | 1 dòng bảng A có nhiều dòng bảng B — khóa ngoại đặt ở bảng "nhiều" | 13 |
+| **quan hệ nhiều–nhiều (many-to-many)** | Nhiều dòng A ↔ nhiều dòng B — cần bảng trung gian (junction table) để phá thành hai quan hệ 1-nhiều | 13 |
+| **foreign key (khóa ngoại)** | Constraint ép giá trị cột phải tồn tại trong bảng khác (`REFERENCES`) — database tự chặn insert dữ liệu lỏng lẻo, bảo vệ toàn vẹn dữ liệu | 13 |
+| **junction table (bảng trung gian)** | Bảng nối hai bảng trong quan hệ nhiều-nhiều — chứa khóa ngoại trỏ tới cả hai bảng (vd enrollments) | 13 |
+| **CHECK constraint** | Ràng buộc giới hạn giá trị cột (vd `price >= 0`) — database tự chặn giá trị không hợp lệ | 13 |
+| **UNIQUE tổ hợp** | Unique trên tổ hợp nhiều cột `UNIQUE (a, b)` — chống trùng cặp (vd một user chỉ đăng ký một khóa 1 lần) | 13 |
+| **JOIN** | Mệnh đề SQL gộp nhiều bảng theo quan hệ — nối bảng này với bảng kia qua khóa ngoại để trả câu hỏi nghiệp vụ | 13 |

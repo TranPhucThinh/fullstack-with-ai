@@ -31,7 +31,8 @@
 - `.agents/` (cấu hình skill) bị ignore — KHÔNG commit
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
-## Đang làm việc — Bài 13 (Thiết kế database e-learning)
+
+## Đang làm việc — Bài 14 (Auth cơ bản bằng Express — bcrypt, JWT)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
@@ -41,6 +42,6 @@
 - ✅ **Cheat-sheet MỐC**: tạo `reference/node-express-cheatsheet.html` (Bài 05–11) — vì đã qua 5+ bài kể từ cheat-sheet gần nhất (rule A22).
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
 - Điểm yếu cần theo dõi: (1) `courses` là module-level array bị mutate giữa lần chạy tsx watch — bài 12 giải bằng PostgreSQL; (2) chưa thực hành xóa express.json() để thử lỗi; (3) chưa có thực hành xử lý lỗi stream (pipeline()).
-- ✅ **Bài 13 ĐÃ SOẠN** (`0013-thiet-ke-database-elearning.html` — ERD users/courses/enrollments, quan hệ 1-1/1-nhiều/nhiều-nhiều, khóa ngoại REFERENCES/CHECK/UNIQUE tổ hợp, JOIN 3 bảng). Đã verify XANH trong DB tạm: CREATE bảng OK, insert OK, vi phạm FK bị chặn, vi phạm UNIQUE bị chặn, JOIN "user 1 học khóa nào" đúng. Chờ học viên thực hành.
-- Tiếp theo: học viên thực hành Bài 13 (đã soạn + verify). Sau khi hoàn thành: ghi LR-0015 + bổ sung GLOSSARY thuật ngữ bài 13 (ERD, foreign key, 1-nhiều, nhiều-nhiều, junction table, JOIN, CHECK, UNIQUE tổ hợp) — quy tắc A23.
+- ✅ **Bài 13 HOÀN THÀNH** (học viên tự tạo bảng courses/enrollments + insert + JOIN trên PostgreSQL 16 thật; verify: 3 bảng users/courses/enrollments, 2 khóa, 3 enrollment, JOIN "user 1 học khóa nào" đúng; LR-0015 + GLOSSARY thuật ngữ bài 13 đã ghi; index.html cập nhật Bài 13 → done).
+- Tiếp theo: soạn Bài 14 "Auth cơ bản bằng Express — bcrypt, JWT" (đăng ký/đăng nhập, hash mật khẩu, token, bắt lỗi email trùng 409). Cần cài bcrypt + jsonwebtoken (quy ước mới: AI cứ cài package cần thiết).
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).
