@@ -90,3 +90,13 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **CHECK constraint** | Ràng buộc giới hạn giá trị cột (vd `price >= 0`) — database tự chặn giá trị không hợp lệ | 13 |
 | **UNIQUE tổ hợp** | Unique trên tổ hợp nhiều cột `UNIQUE (a, b)` — chống trùng cặp (vd một user chỉ đăng ký một khóa 1 lần) | 13 |
 | **JOIN** | Mệnh đề SQL gộp nhiều bảng theo quan hệ — nối bảng này với bảng kia qua khóa ngoại để trả câu hỏi nghiệp vụ | 13 |
+| **hashing (hàm băm)** | Hàm một chiều biến mật khẩu thành chuỗi hash — không suy ngược ra mật khẩu gốc; bcrypt chậm có salt, chống brute-force | 14 |
+| **bcrypt** | Thư viện hash mật khẩu phổ biến trong Node — `bcrypt.hash(pw, cost)` tạo hash, `bcrypt.compare(pw, hash)` so sánh | 14 |
+| **cost factor** | Tham số độ khó của bcrypt (vd 10) — quyết định thuật toán chậm tới mức nào; càng cao càng an toàn nhưng tốn CPU | 14 |
+| **JWT (JSON Web Token)** | Chuẩn token gồm `header.payload.signature` ký bằng secret — server verify được token có bị sửa; stateless, không cần lưu session | 14 |
+| **jwt.sign()** | Khởi tạo token: nhận payload (vd { userId }) + secret + expiresIn → ra chuỗi token gửi cho client | 14 |
+| **jwt.verify()** | Kiểm tra token: chữ ký đúng + chưa hết hạn thì trả payload, sai secret ném lỗi | 14 |
+| **Bearer token** | Cách gửi token trong HTTP header: `Authorization: Bearer <token>` — chuẩn phổ biến cho API auth | 14 |
+| **error 23505 → 409** | Bắt mã lỗi UNIQUE của PostgreSQL (email trùng) và trả 409 Conflict thay vì 500 — xử lý lỗi database có chủ đích | 14 |
+| **status 401 Unauthorized** | Lỗi chưa xác thực: thiếu token, token sai/hết hạn, hoặc sai email/mật khẩu — trả chung một thông điệp để chống user enumeration | 14 |
+| **module augmentation** | Kỹ thuật TS mở rộng type có sẵn của thư viện (vd thêm `Express.Request.userId`) qua file `.d.ts` + `declare global` — không sửa code thư viện | 14 |
