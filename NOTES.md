@@ -32,7 +32,7 @@
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
 
-## Đang làm việc — Bài 14 (Auth cơ bản bằng Express — bcrypt, JWT)
+## Đang làm việc — Bài 15 (Tổng kết Express — e-learning chạy bằng Express thuần)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
@@ -43,5 +43,7 @@
 - Thực chiến: học viên gặp EADDRINUSE cổng 5000 do ControlCenter macOS chiếm → tự đổi `.env` sang `PORT=4000`. Đã ghi vào LR-0010.
 - Điểm yếu cần theo dõi: (1) `courses` là module-level array bị mutate giữa lần chạy tsx watch — bài 12 giải bằng PostgreSQL; (2) chưa thực hành xóa express.json() để thử lỗi; (3) chưa có thực hành xử lý lỗi stream (pipeline()).
 - ✅ **Bài 13 HOÀN THÀNH** (học viên tự tạo bảng courses/enrollments + insert + JOIN trên PostgreSQL 16 thật; verify: 3 bảng users/courses/enrollments, 2 khóa, 3 enrollment, JOIN "user 1 học khóa nào" đúng; LR-0015 + GLOSSARY thuật ngữ bài 13 đã ghi; index.html cập nhật Bài 13 → done).
-- Tiếp theo: soạn Bài 14 "Auth cơ bản bằng Express — bcrypt, JWT" (đăng ký/đăng nhập, hash mật khẩu, token, bắt lỗi email trùng 409). Cần cài bcrypt + jsonwebtoken (quy ước mới: AI cứ cài package cần thiết).
+- ✅ **Bài 14 HOÀN THÀNH** (học viên tự viết auth vào src/server.ts + FIX lỗi type userId bằng src/types/express.d.ts — module augmentation; sửa luôn lỗi `FROM user` → `users`; verify typecheck exit 0 + 6 case curl XANH: register 201, register trùng 409, login sai 401, me không token 401, me có token 200; LR-0016 + GLOSSARY 10 thuật ngữ bài 14 đã ghi; index.html Bài 14 → done; commit a23c907 đã push).
+- Điểm mạnh mới: tự fix lỗi type bằng TS module augmentation — đúng cách senior; chủ động sửa lỗi SQL trong code mẫu.
+- Tiếp theo: soạn Bài 15 "Tổng kết Express — e-learning chạy bằng Express thuần" — gom CRUD users/courses/enrollments + auth thành API hoàn chỉnh.
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).
