@@ -103,3 +103,8 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **protected route** | Route được bảo vệ bằng middleware `auth` — chỉ chạy khi có token JWT hợp lệ; không token → 401 | 15 |
 | **error 23503** | Mã lỗi PostgreSQL vi phạm khóa ngoại (REFERENCES) — vd enroll course_id không tồn tại; bắt và trả 400 thay vì 500 | 15 |
 | **JOIN qua bảng trung gian (ứng dụng)** | Áp dụng JOIN để trả "khóa của tôi": nối enrollments với courses qua course_id, lọc theo user_id từ token — research nghiệp vụ nhiều-nhiều | 15 |
+| **type alias** | Đặt tên cho một kiểu để tái sử dụng (`type UserId = number`) — dùng cho union/alias | 16 |
+| **union type** | Kiểu "một trong nhiều giá trị" (`'admin' \| 'teacher' \| 'student'`) — giới hạn đúng tập giá trị, TS bắt lỗi gán sai lúc compile | 16 |
+| **interface** | Mô tả hình dạng object (field + kiểu) — chuẩn cho entity/DTO trong NestJS, mở rộng được bằng `extends` | 16 |
+| **generics** | Tham số kiểu `<T>` cho hàm/class dùng chung nhiều kiểu mà vẫn giữ type an toàn (vd `first<T>(arr: T[])`) | 16 |
+| **type assertion (`as`)** | Ép kiểu tĩnh (`req.body as CreateCourseBody`) nói cho TS biết hình dạng — KHÔNG validate ở runtime | 16 |

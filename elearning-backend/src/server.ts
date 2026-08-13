@@ -6,6 +6,12 @@ import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = 'secret-dev-doi-sau'
 
+interface CreateCourseBody {
+  title: string
+  price?: number
+  description?: string
+}
+
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -110,7 +116,7 @@ app.get('/api/courses', async (req: Request, res: Response) => {
 
 // POST /api/courses — tạo khóa (CHỈ user đăng nhập)
 app.post('/api/courses', auth, async (req: Request, res: Response) => {
-  const { title, price, description } = req.body ?? {}
+  const { title, price, description } = req.body as CreateCourseBody
   if (!title) {
     res.status(400).json({ error: 'title là bắt buộc' })
     return
