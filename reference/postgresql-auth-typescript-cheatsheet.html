@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cheat-sheet · PostgreSQL, Auth & TypeScript</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../lessons/lesson.css">
+<style>
+  body { background: #0f1117; }
+  .wrap { max-width: 900px; }
+  h1 { font-size: 2rem; margin-bottom: 4px; }
+  .subtitle { margin-top: 0; }
+  .cheat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .cheat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .cheat-card h2 { font-size: 1rem; margin: 0 0 8px; padding: 0; border: none; display: flex; align-items: center; gap: 6px; }
+  .cheat-card h2::before { content: '▸'; color: var(--accent); }
+  .cheat-card table { font-size: 13px; }
+  .cheat-card table th { font-size: 11px; }
+  .cheat-card table td, .cheat-card table th { padding: 4px 8px; }
+  .cheat-card p, .cheat-card li { font-size: 13px; }
+  .cheat-card ul { padding-left: 16px; margin: 6px 0; }
+  .cheat-card code { font-size: 12px; }
+  .full-width { grid-column: 1 / -1; }
+  .ref-meta { text-align: center; color: var(--text-dim); font-size: 13px; margin: 10px 0 20px; }
+  @media print { .cheat-grid { page-break-after: always; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>📖 Cheat-sheet: PostgreSQL, Auth & TypeScript</h1>
+<p class="subtitle">Cô đọng kiến thức Bài 12–17 — SQL thật + thiết kế schema production + auth (bcrypt/JWT) + nền TypeScript cho NestJS.</p>
+<p class="ref-meta">Bài 12–17 · Cập nhật 13/08/2026</p>
+
+<div class="cheat-grid">
+
+  <div class="cheat-card">
+    <h2>Kết nối PostgreSQL (Bài 12)</h2>
+    <div class="code-block">
+      <span class="code-label">pg.Pool + parameterized query</span>
+<pre><code><span class="kw">import</span> pg <span class="kw">from</span> <span class="str">'pg'</span>
+<span class="kw">import</span> { loadEnvFile } <span class="kw">from</span> <span class="str">'node:process'</span>
+<span class="fn">loadEnvFile</span>()   <span class="cmt">// nạp .env vào process.env</span>
+<span class="kw">const</span> pool = <span class="kw">new</span> pg.<span class="fn">Pool</span>() <span class="cmt">// đọc PG* env vars</span>
+<span class="kw">const</span> { rows, rowCount } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+  <span class="str">'SELECT * FROM users WHERE id = $1'</span>, [id]
+)</code></pre>
+    </div>
+    <p><strong>$1, $2</strong> (không nối chuỗi) → chống SQL injection. <code>rowCount</code> = số dòng bị ảnh hưởng.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Schema cơ bản (Bài 13)</h2>
+    <table class="data">
+      <thead><tr><th>Khái niệm</th><th>Cú pháp / ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td>Khóa chính tự tăng</td><td><code>id SERIAL PRIMARY KEY</code></td></tr>
+        <tr><td>Không trùng</td><td><code>email TEXT UNIQUE NOT NULL</code></td></tr>
+        <tr><td>Giới hạn giá trị</td><td><code>price INTEGER CHECK (price &gt;= 0)</code></td></tr>
+        <tr><td>Khóa ngoại</td><td><code>course_id INTEGER REFERENCES courses(id)</code></td></tr>
+        <tr><td>Chống trùng cặp</td><td><code>UNIQUE (user_id, course_id)</code></td></tr>
+      </tbody>
+    </table>
+    <p>Nhiều–nhiều cần <strong>junction table</strong> (vd <code>enrollments</code>) chứa 2 khóa ngoại.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Chuẩn hóa 1NF/2NF/3NF (Bài 13-pro)</h2>
+    <table class="data">
+      <thead><tr><th>Bậc</th><th>Quy tắc</th><th>Ví dụ vi phạm</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1NF</strong></td><td>Mỗi ô 1 giá trị nguyên tử</td><td><code>tags = 'nestjs,sql'</code></td></tr>
+        <tr><td><strong>2NF</strong></td><td>Không phụ thuộc 1 phần khóa tổ hợp</td><td><code>course_title</code> trong bảng (user_id, course_id)</td></tr>
+        <tr><td><strong>3NF</strong></td><td>Không phụ thuộc bắc cầu</td><td><code>course_title</code> lưu kèm trong enrollments</td></tr>
+      </tbody>
+    </table>
+    <p>Đôi khi cố ý <strong>denormalize</strong> vì hiệu năng — nhưng phải biết đang phá chuẩn và đánh đổi gì.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>ON DELETE (Bài 13-pro)</h2>
+    <table class="data">
+      <thead><tr><th>Hành động</th><th>Khi xóa dòng cha</th><th>Dùng khi</th></tr></thead>
+      <tbody>
+        <tr><td><code>RESTRICT</code></td><td>Chặn xóa (báo lỗi)</td><td>Không muốn mất dữ liệu (orders, payments)</td></tr>
+        <tr><td><code>CASCADE</code></td><td>Xóa luôn dòng con</td><td>Con không sống được thiếu cha (lessons của course)</td></tr>
+        <tr><td><code>SET NULL</code></td><td>Giữ con, bỏ FK về NULL</td><td>Con vẫn có giá trị khi cha mất (course khi instructor bị xóa)</td></tr>
+      </tbody>
+    </table>
+    <p>Quy tắc nhớ: <em>"dòng con sống được thiếu cha không?"</em> — sống được → SET NULL/RESTRICT; không → CASCADE.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Index & EXPLAIN (Bài 13-pro)</h2>
+    <div class="code-block">
+      <span class="code-label">Chứng minh index bằng EXPLAIN</span>
+<pre><code><span class="cmt">-- trước: Seq Scan (quét cả bảng)</span>
+<span class="kw">EXPLAIN ANALYZE SELECT</span> * <span class="kw">FROM</span> enrollments <span class="kw">WHERE</span> user_id = <span class="num">1</span>;
+<span class="kw">CREATE INDEX</span> idx_enrollments_user_id <span class="kw">ON</span> enrollments(user_id);
+<span class="cmt">-- sau: Index Scan (chỉ đọc dòng khớp)</span></code></pre>
+    </div>
+    <p>PK tự có index, <strong>cột khóa ngoại thì KHÔNG</strong> — phải tạo thủ công khi JOIN/lọc thường xuyên. Index = đọc nhanh đổi lấy ghi chậm.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>JOIN & thống kê (Bài 13/13-pro)</h2>
+    <div class="code-block">
+      <span class="code-label">LEFT JOIN + GROUP BY + HAVING</span>
+<pre><code><span class="kw">SELECT</span> c.title, <span class="fn">COUNT</span>(e.user_id) <span class="kw">AS</span> so_hoc_vien
+<span class="kw">FROM</span> courses c
+<span class="kw">LEFT JOIN</span> enrollments e <span class="kw">ON</span> e.course_id = c.id
+<span class="kw">GROUP BY</span> c.id, c.title
+<span class="kw">HAVING</span> <span class="fn">COUNT</span>(e.user_id) = <span class="num">0</span>;</code></pre>
+    </div>
+    <p><strong>LEFT JOIN</strong> giữ cả khóa 0 người học (INNER JOIN làm nó biến mất). <code>WHERE</code> lọc trước khi gộp; <code>HAVING</code> lọc sau GROUP BY.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Migration, timestamps, soft delete (Bài 13-pro)</h2>
+    <ul>
+      <li><strong>Migration</strong> = "git cho schema": mỗi thay đổi là 1 file version, chạy theo thứ tự → tái lập được môi trường.</li>
+      <li><code>created_at</code>/<code>updated_at</code> <code>TIMESTAMPTZ DEFAULT now()</code>.</li>
+      <li><strong>Soft delete</strong>: thêm <code>deleted_at TIMESTAMPTZ</code>, truy vấn lọc <code>deleted_at IS NULL</code> — khôi phục được, giữ lịch sử.</li>
+      <li><strong>Surrogate key</strong> (<code>SERIAL id</code>) làm PK; khóa tự nhiên (email) đặt UNIQUE riêng.</li>
+    </ul>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Auth — bcrypt + JWT (Bài 14)</h2>
+    <div class="code-block">
+      <span class="code-label">Hash + token + verify</span>
+<pre><code><span class="kw">import</span> bcrypt <span class="kw">from</span> <span class="str">'bcrypt'</span>
+<span class="kw">import</span> jwt <span class="kw">from</span> <span class="str">'jsonwebtoken'</span>
+<span class="kw">const</span> hash = <span class="kw">await</span> bcrypt.<span class="fn">hash</span>(pw, <span class="num">10</span>)   <span class="cmt">// cost factor</span>
+<span class="kw">const</span> ok = <span class="kw">await</span> bcrypt.<span class="fn">compare</span>(pw, hash)
+<span class="kw">const</span> token = jwt.<span class="fn">sign</span>({ userId }, SECRET, { expiresIn: <span class="str">'1h'</span> })
+<span class="kw">const</span> payload = jwt.<span class="fn">verify</span>(token, SECRET) <span class="cmt">// sai secret → throw</span></code></pre>
+    </div>
+    <p>Gửi token: <code>Authorization: Bearer &lt;token&gt;</code>. Hash một chiều, JWT stateless.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>Lỗi database có chủ đích (Bài 14/15)</h2>
+    <table class="data">
+      <thead><tr><th>Mã lỗi PG</th><th>Nghĩa</th><th>Trả về</th></tr></thead>
+      <tbody>
+        <tr><td><code>23505</code></td><td>Vi phạm UNIQUE (email trùng, đăng ký trùng)</td><td>409 Conflict</td></tr>
+        <tr><td><code>23503</code></td><td>Vi phạm khóa ngoại (course_id không tồn tại)</td><td>400 Bad Request</td></tr>
+      </tbody>
+    </table>
+    <p>Bắt <code>e.code</code> trong try/catch để trả đúng status, không để lọt thành 500.</p>
+  </div>
+
+  <div class="cheat-card">
+    <h2>TypeScript nền (Bài 16)</h2>
+    <div class="code-block">
+      <span class="code-label">type alias, union, interface, generics</span>
+<pre><code><span class="kw">type</span> Role = <span class="str">'admin'</span> | <span class="str">'teacher'</span> | <span class="str">'student'</span> <span class="cmt">// union</span>
+<span class="kw">interface</span> User { id: <span class="tbl">number</span>; role: Role } <span class="cmt">// object</span>
+<span class="kw">function</span> first&lt;T&gt;(arr: T[]): T | <span class="kw">undefined</span> { <span class="kw">return</span> arr[<span class="num">0</span>] }
+<span class="kw">const</span> body = req.body <span class="kw">as</span> CreateCourseBody <span class="cmt">// type assertion</span></code></pre>
+    </div>
+    <p>Interface mô tả object (entity/DTO); type cho union/alias. <code>as</code> ép kiểu tĩnh — KHÔNG validate runtime (Bài 22 xử lý).</p>
+  </div>
+
+  <div class="cheat-card full-width">
+    <h2>Decorators & Utility types (Bài 17)</h2>
+    <div class="code-block">
+      <span class="code-label">Decorator method/class + factory — nền tảng NestJS</span>
+<pre><code><span class="cmt">// Method decorator — (target, propertyKey, descriptor)</span>
+<span class="kw">function</span> log(target, propertyKey, descriptor) {
+  <span class="kw">const</span> original = descriptor.value
+  descriptor.value = <span class="kw">function</span>(...args) { console.<span class="fn">log</span>(propertyKey, args); <span class="kw">return</span> original.<span class="fn">apply</span>(<span class="kw">this</span>, args) }
+}
+<span class="cmt">// Class decorator factory — hàm NHẬN tham số, TRẢ VỀ decorator</span>
+<span class="kw">function</span> Register(name) { <span class="kw">return</span> ctor => { registry[name] = ctor } }
+@<span class="fn">Register</span>(<span class="str">'CalcService'</span>) <span class="kw">class</span> CalcService { @log add(a, b) { <span class="kw">return</span> a + b } }
+
+<span class="cmt">// Utility types — dẫn xuất từ 1 interface</span>
+<span class="kw">type</span> NewCourse = <span class="tbl">Omit</span>&lt;Course, <span class="str">'id'</span>&gt;        <span class="cmt">// bỏ field</span>
+<span class="kw">type</span> Patch = <span class="tbl">Partial</span>&lt;Course&gt;          <span class="cmt">// mọi field optional</span>
+<span class="kw">type</span> Card = <span class="tbl">Pick</span>&lt;Course, <span class="str">'id'</span>|<span class="str">'title'</span>&gt; <span class="cmt">// chỉ giữ 2 field</span>
+<span class="kw">type</span> Frozen = <span class="tbl">Readonly</span>&lt;Course&gt;       <span class="cmt">// cấm sửa</span></code></pre>
+    </div>
+    <p>⚙️ Cần <code>experimentalDecorators: true</code>. <code>@Register('x')</code> = DI container thu nhỏ của NestJS. tsx tôn trọng <code>include</code> → file dùng decorator phải nằm trong <code>src/</code>.</p>
+  </div>
+
+</div>
+
+<p class="try-it" style="text-align:center; margin-top:20px;">
+📌 <a href="../lessons/index.html">🏠 Mục lục</a> ·
+<a href="../lessons/index.html">📚 Lộ trình</a> ·
+<a href="../GLOSSARY.md">📖 Glossary</a>
+</p>
+
+</div>
+<script src="../lessons/lesson-enhance.js"></script>
+</body>
+</html>

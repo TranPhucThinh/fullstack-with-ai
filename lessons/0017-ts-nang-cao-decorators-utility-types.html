@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 17 · TypeScript nâng cao — decorators & utility types</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 3 · Bài 17</span>
+  <h1>TypeScript nâng cao — decorators &amp; utility types</h1>
+  <p class="subtitle">Decorators là thứ biến TypeScript thành NestJS — mở hộp đen <code>@Controller()</code>/<code>@Get()</code> để tự viết, cùng utility types giúp viết type linh hoạt như senior.</p>
+  <p class="meta-line">⏱ ~75 phút · 🎯 Mục tiêu: tự viết được class decorator + method decorator, dùng <code>Partial</code>/<code>Pick</code>/<code>Omit</code>/<code>Readonly</code>, và giải thích được vì sao NestJS cần decorators + <code>experimentalDecorators</code>.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 16 bạn có <strong>type alias, interface, generics</strong> — nền tảng để mô tả dữ liệu. Nhưng mở một file NestJS bất kỳ, thứ đầu tiên đập vào mắt không phải interface, mà là những dấu <code>@</code>: <code>@Controller()</code>, <code>@Get()</code>, <code>@Injectable()</code>, <code>@Body()</code>. Đó là <strong>decorators</strong>. Bài này mở hộp đen: decorator là gì, tự viết thế nào, và vì sao NestJS chọn nó làm xương sống. Đây là bài <em>cuối cùng</em> chuẩn bị trước khi sang Module 4 (NestJS).</p>
+  </div>
+
+  <h2>1. Decorator là gì — hàm "bọc" thêm hành vi</h2>
+
+  <p><strong>Decorator</strong> là một <em>hàm</em> TypeScript gọi vào thời điểm khai báo class/method/property/parameter, để <strong>thêm hành vi hoặc metadata</strong> mà không cần sửa code gốc. Thay vì viết logic log vào từng method, bạn gắn <code>@log</code> lên trên method — decorator tự lo phần còn lại.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao quan trọng với bạn?</div>
+    <p>NestJS <strong>hoàn toàn xây trên decorators</strong>: <code>@Controller()</code> đánh dấu "đây là class nhận request", <code>@Get()</code> đánh dấu "đây là handler cho GET", <code>@Injectable()</code> đánh dấu "class này cho DI quản lý". Hiểu decorator = hiểu vì sao NestJS trông như vậy, thay vì học vẹt cú pháp <code>@</code>.</p>
+  </div>
+
+  <p>Decorators chưa phải chuẩn JavaScript chính thức (đang ở stage 3), nên TypeScript cần bật cờ <strong><code>experimentalDecorators</code></strong>. NestJS dùng loại decorator "legacy" này (cùng với <code>emitDecoratorMetadata</code> để phản chiếu type — sẽ bàn khi tới Module 4). Theo <a href="https://www.typescriptlang.org/docs/handbook/decorators.html" target="_blank">TypeScript docs</a>, legacy decorator là một loại khai báo đặc biệt có thể gắn vào class, method, accessor, property hoặc parameter.</p>
+
+  <div class="code-block">
+    <span class="code-label">tsconfig.json — đã thêm sẵn vào dự án của bạn</span>
+<pre><code>{
+  <span class="str">"compilerOptions"</span>: {
+    <span class="str">"experimentalDecorators"</span>: <span class="kw">true</span>, <span class="cmt">// bật decorators (kiểu NestJS)</span>
+    ...
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Một "bẫy" thực tế vừa gặp phải (đáng để senior biết)</div>
+    <p>Dự án có <code>include: ["src"]</code> trong tsconfig — nghĩa là chỉ file trong <code>src/</code> mới được tsconfig "phủ". <strong>tsx tôn trọng <code>include</code></strong>: file nằm ngoài (như thư mục <code>demo/</code>) sẽ <em>không nhận</em> <code>experimentalDecorators</code> → decorator chạy sai (lỗi <code>descriptor.value undefined</code>). Vì vậy demo bài này nằm trong <code>src/</code>, không phải <code>demo/</code>. Đây là minh chứng "hiểu bản chất" đáng giá: <strong>cấu hình compile quyết định cách file của bạn được biên dịch, không chỉ nơi bạn đặt nó.</strong></p>
+  </div>
+
+  <h2>2. Method decorator — bọc lại method</h2>
+
+  <p>Method decorator nhận 3 tham số: <code>target</code> (prototype), <code>propertyKey</code> (tên method), <code>descriptor</code> (mô tả method — trong đó <code>descriptor.value</code> là hàm gốc). Ta thay <code>descriptor.value</code> bằng hàm mới "bọc" hàm gốc:</p>
+
+  <div class="code-block">
+    <span class="code-label">Method decorator @log — in args + kết quả mỗi lần gọi (đã verify XANH)</span>
+<pre><code><span class="cmt">// Method decorator: nhận (target, propertyKey, descriptor)</span>
+<span class="kw">function</span> log(target: <span class="tbl">any</span>, propertyKey: <span class="tbl">string</span>, descriptor: <span class="tbl">PropertyDescriptor</span>) {
+  <span class="kw">const</span> original = descriptor.value            <span class="cmt">// giữ hàm gốc</span>
+  descriptor.value = <span class="kw">function</span> (...args: <span class="tbl">any</span>[]) { <span class="cmt">// thay bằng hàm bọc</span>
+    console.<span class="fn">log</span>(<span class="str">`→ ${propertyKey}(${args.join(', ')})`</span>)
+    <span class="kw">const</span> result = original.<span class="fn">apply</span>(<span class="kw">this</span>, args)   <span class="cmt">// gọi hàm gốc</span>
+    console.<span class="fn">log</span>(<span class="str">`← ${propertyKey} = ${result}`</span>)
+    <span class="kw">return</span> result
+  }
+}
+
+<span class="kw">class</span> CalcService {
+  @log <span class="cmt">// gắn decorator — không cần sửa thân hàm add</span>
+  add(a: <span class="tbl">number</span>, b: <span class="tbl">number</span>): <span class="tbl">number</span> {
+    <span class="kw">return</span> a + b
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Cơ chế cốt lõi</div>
+    <p>Decorator chạy <strong>một lần lúc khai báo class</strong> (không phải mỗi lần gọi method). Nó "chặn" method gốc, thay bằng hàm bọc — mọi lần gọi sau đều đi qua hàm bọc. Đây là pattern <strong>proxy/monkey-patch có kiểm soát</strong>: thêm log, đo thời gian, kiểm tra quyền… mà code nghiệp vụ vẫn sạch.</p>
+  </div>
+
+  <h2>3. Class decorator &amp; decorator factory</h2>
+
+  <p>Class decorator nhận <code>constructor</code> của class. Muốn truyền thêm tham số (như <code>@Register('CalcService')</code>), ta dùng <strong>decorator factory</strong> — một hàm <em>trả về</em> decorator:</p>
+
+  <div class="code-block">
+    <span class="code-label">Class decorator @Register — đăng ký vào "registry" (mô phỏng DI của NestJS)</span>
+<pre><code><span class="cmt">// Factory: hàm NHẬN tham số, TRẢ VỀ decorator thật</span>
+<span class="kw">function</span> Register(name: <span class="tbl">string</span>) {
+  <span class="kw">return function</span> (constructor: <span class="tbl">any</span>) {
+    <span class="kw">const</span> g = globalThis <span class="kw">as</span> <span class="tbl">any</span>
+    g.__registry = g.__registry ?? {}
+    g.__registry[name] = constructor   <span class="cmt">// lưu class vào registry</span>
+  }
+}
+
+@<span class="fn">Register</span>(<span class="str">'CalcService'</span>) <span class="cmt">// factory → gọi Register('CalcService') rồi áp decorator</span>
+<span class="kw">class</span> CalcService { ... }</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Đây chính là DI Container của NestJS</div>
+    <p><code>@Register('CalcService')</code> đăng ký class vào một "sổ danh bạ" (registry). NestJS làm đúng thế này nhưng lớn hơn: <code>@Injectable()</code> đăng ký class vào DI container, rồi khi cần, container <em>tự tạo instance và inject</em> vào constructor. Bạn vừa tự viết bản thu nhỏ của thứ Module 4 sẽ học — đó là lý do decorators là "nền tảng NestJS".</p>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">🧠 Phân biệt: decorator vs factory</div>
+    <p><code>@log</code> là decorator <strong>trực tiếp</strong> (TS gọi ngay <code>log(...)</code>). <code>@Register('CalcService')</code> là <strong>factory</strong> — vì có dấu ngoặc <code>()</code>, TS gọi <code>Register('CalcService')</code> trước, kết quả trả về mới là decorator. Quy tắc nhớ: <em>có dấu ngoặc = factory</em>. NestJS dùng cả hai: <code>@Injectable()</code> là factory, <code>@Body()</code> là factory… hầu hết đều là factory để nhận tham số cấu hình.</p>
+  </div>
+
+  <h2>4. NestJS dùng decorators như thế nào</h2>
+
+  <p>Theo <a href="https://docs.nestjs.com/providers" target="_blank">NestJS docs</a>, decorators là cách NestJS "khai báo" mọi thứ mà không cần config tập trung. Bảng ánh xạ:</p>
+
+  <table class="data">
+    <thead><tr><th>NestJS decorator</th><th>Gắn vào</th><th>Vai trò</th></tr></thead>
+    <tbody>
+      <tr><td><code>@Controller()</code></td><td>class</td><td>Đánh dấu class nhận HTTP request</td></tr>
+      <tr><td><code>@Injectable()</code></td><td>class</td><td>Đăng ký vào DI container (như <code>@Register</code>)</td></tr>
+      <tr><td><code>@Get()</code>/<code>@Post()</code></td><td>method</td><td>Ánh xạ method tới route + HTTP verb</td></tr>
+      <tr><td><code>@Body()</code>/<code>@Param()</code></td><td>parameter</td><td>Bơm dữ liệu request vào tham số</td></tr>
+    </tbody>
+  </table>
+
+  <p>Chưa hết: NestJS bật thêm <code>emitDecoratorMetadata: true</code> + gói <code>reflect-metadata</code> để decorator <strong>tự ghi type</strong> của tham số constructor — nhờ đó DI biết cần inject đúng loại nào. Đây là phần sẽ đào sâu ở Bài 19-20. Giờ bạn chỉ cần nắm: <em>decorator = cách NestJS gắn metadata vào class/method để framework đọc và điều phối.</em></p>
+
+  <h2>5. Utility types — biến đổi type có sẵn</h2>
+
+  <p>TS có sẵn các <strong>utility types</strong> giúp "chế" type từ type có sẵn, thay vì viết lại interface mới mỗi lần. Theo <a href="https://www.typescriptlang.org/docs/handbook/utility-types.html" target="_blank">TypeScript docs</a>, đây là các type được xây dựng sẵn. Bốn cái bạn dùng nhiều nhất:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/ts17-decorators-demo.ts — utility types (đã verify XANH)</span>
+<pre><code><span class="kw">interface</span> Course {
+  id: <span class="tbl">number</span>
+  title: <span class="tbl">string</span>
+  price: <span class="tbl">number</span>
+  description: <span class="tbl">string</span>
+  published: <span class="tbl">boolean</span>
+}
+
+<span class="kw">type</span> NewCourse = <span class="tbl">Omit</span>&lt;Course, <span class="str">'id'</span> | <span class="str">'published'</span>&gt;  <span class="cmt">// bỏ id + published (server tự sinh)</span>
+<span class="kw">type</span> CoursePatch = <span class="tbl">Partial</span>&lt;Course&gt;                  <span class="cmt">// mọi field thành optional</span>
+<span class="kw">type</span> CourseCard = <span class="tbl">Pick</span>&lt;Course, <span class="str">'id'</span> | <span class="str">'title'</span>&gt;      <span class="cmt">// chỉ lấy 2 field</span>
+<span class="kw">type</span> ReadonlyCourse = <span class="tbl">Readonly</span>&lt;Course&gt;              <span class="cmt">// cấm sửa</span>
+
+<span class="kw">const</span> draft: NewCourse = { title: <span class="str">'NestJS'</span>, price: <span class="num">100</span>, description: <span class="str">'học từ gốc'</span> }
+<span class="kw">const</span> patch: CoursePatch = { price: <span class="num">50</span> }  <span class="cmt">// chỉ cần sửa 1 field</span>
+<span class="kw">const</span> card: CourseCard = { id: <span class="num">1</span>, title: <span class="str">'NestJS'</span> }</code></pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Utility type</th><th>Làm gì</th><th>Dùng khi</th></tr></thead>
+    <tbody>
+      <tr><td><code>Partial&lt;T&gt;</code></td><td>Mọi field thành optional</td><td>Cập nhật một phần (PATCH)</td></tr>
+      <tr><td><code>Pick&lt;T, K&gt;</code></td><td>Chỉ giữ các field K</td><td>Trả về "bản tóm tắt" (list)</td></tr>
+      <tr><td><code>Omit&lt;T, K&gt;</code></td><td>Bỏ các field K</td><td>Loại field server tự sinh (id, mật khẩu)</td></tr>
+      <tr><td><code>Readonly&lt;T&gt;</code></td><td>Cấm sửa field</td><td>Bảo vệ dữ liệu khỏi sửa nhầm</td></tr>
+      <tr><td><code>Record&lt;K, V&gt;</code></td><td>Ánh xạ key → value</td><td>Dict/danh sách tra cứu</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao senior thích utility types?</div>
+    <p>Một interface là <strong>nguồn chân lý duy nhất</strong>; các biến thể (<code>Omit</code>/<code>Pick</code>/<code>Partial</code>) <em>dẫn xuất</em> từ nó. Khi thêm field vào <code>Course</code>, mọi biến thể tự cập nhật — không sửa 5 chỗ. Ngược lại, viết 5 interface riêng sẽ lệch nhau khi schema đổi. Đây là tư duy "một nguồn, nhiều hình chiếu" — NestJS dùng <code>PartialType()</code>/<code>OmitType()</code> (từ <code>@nestjs/mapped-types</code>) đúng tinh thần này cho DTO.</p>
+  </div>
+
+  <h2>6. Thực hành — tự viết thêm một decorator</h2>
+
+  <p>Bước 1: tạo file <code>src/ts17-decorators-demo.ts</code> với code trên (mục 2, 3, 5), rồi chạy:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal</span>
+<pre><code><span class="tbl">npx</span> tsx src/ts17-decorators-demo.ts</code></pre>
+  </div>
+
+  <p>Output kỳ vọng: <code>→ add(2, 3)</code> / <code>← add = 5</code> / <code>registry có CalcService: true</code> / <code>OK: decorators + utility types xanh</code>.</p>
+
+  <p>Bước 2 (<strong>thử thách nhỏ</strong> — mở rộng từ bài): tự viết decorator <code>@time</code> đo thời gian chạy của method (dùng <code>performance.now()</code> hoặc <code>Date.now()</code>), gắn vào <code>add()</code>, và gửi tôi code + output. Đừng nhìn đáp án trước — nếu vướng, gợi ý đã có ở mục 2 (chỉ đổi chỗ <code>console.log</code> thành đo thời gian).</p>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu decorator là gì và cơ chế "hàm bọc" method/class</li>
+      <li>Biết vì sao cần <code>experimentalDecorators</code> (chưa phải chuẩn chính thức)</li>
+      <li>Tự viết method decorator <code>@log</code> + class decorator factory <code>@Register</code></li>
+      <li>Hiểu cơ chế DI của NestJS nhìn từ decorator (registry = DI container thu nhỏ)</li>
+      <li>Dùng <code>Partial</code>/<code>Pick</code>/<code>Omit</code>/<code>Readonly</code> để dẫn xuất type</li>
+      <li>Biết tsx tôn trọng <code>include</code> của tsconfig (bẫy cấu hình thực tế)</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao phải bật <code>experimentalDecorators: true</code> trong tsconfig?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Decorators chưa phải chuẩn JavaScript chính thức (stage 3), nên TS cần cờ thử nghiệm này. NestJS dùng loại decorator legacy này.">A. Decorators chưa phải chuẩn JS chính thức — TS cần cờ thử nghiệm để chấp nhận cú pháp <code>@</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — cờ này không làm code chạy nhanh hơn; nó chỉ cho phép cú pháp decorator.">B. Để code chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — decorator liên quan cú pháp khai báo, không phải lỗi runtime.">C. Để tắt chế độ kiểm tra lỗi runtime</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. <code>@Register('CalcService')</code> khác <code>@log</code> ở điểm gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai đều chạy lúc khai báo class/method, không phải mỗi lần gọi.">B. Register chạy mỗi lần gọi, log chạy lúc khai báo</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! <code>@Register('...')</code> là factory — hàm nhận tham số rồi TRẢ VỀ decorator; <code>@log</code> là decorator trực tiếp. Quy tắc: có dấu ngoặc = factory.">A. <code>@Register(...)</code> là factory (hàm trả về decorator), <code>@log</code> là decorator trực tiếp</button>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai đều là decorator, chỉ khác cách nhận tham số.">C. Register không phải decorator</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Vì sao nên dùng <code>Omit&lt;Course, 'id'&gt;</code> thay vì viết interface mới không có <code>id</code>?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — Omit không làm code nhanh hơn; nó là cách dẫn xuất type.">B. Vì Omit chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — Omit chỉ bỏ field, không thêm tính năng nào.">C. Vì Omit thêm được field mới</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! <code>Course</code> là nguồn chân lý duy nhất; biến thể dẫn xuất từ nó nên khi schema đổi, mọi biến thể tự cập nhật — không sửa nhiều nơi.">A. Giữ một nguồn chân lý duy nhất — schema đổi thì biến thể tự cập nhật</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã viết decorator chạy được nhờ <code>npx tsx</code>. Nhưng "chạy TypeScript trên Node" thực chất đang dựa vào <strong>tsx</strong> biên dịch on-the-fly — còn <code>tsc</code> biên dịch ra <code>dist/</code> rồi <code>node dist/</code> thì khác gì? <code>tsconfig.json</code> còn những gì ta chưa khai thác (<code>outDir</code>, <code>declaration</code>, <code>sourceMap</code>)? Bài 18 sẽ làm rõ "chạy TS với Node" đúng nghĩa, rồi Bài 19 đóng Module 3 bằng câu hỏi lớn: <em>vì sao NestJS chọn TypeScript + DI?</em></p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 18 · Chạy TypeScript với Node — tsx, tsconfig, build ra dist</div>
+    <p class="nd">Hiểu TS chạy trên Node thế nào: tsx (biên dịch on-the-fly) vs tsc build — và khai thác tsconfig đúng mức.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0016-typescript-co-ban.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Tạo <code>src/ts17-decorators-demo.ts</code> (code trong bài), chạy <code>npx tsx src/ts17-decorators-demo.ts</code>, gửi tôi output. Rồi tự viết decorator <code>@time</code> đo thời gian chạy — gửi code + output. Tôi sẽ kiểm tra bạn hiểu cơ chế decorator (không phải học vẹt cú pháp <code>@</code>). Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
