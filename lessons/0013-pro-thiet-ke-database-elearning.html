@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 13-pro · Thiết kế database e-learning PRO — chuẩn hóa, khóa ngoại nâng cao, index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 13-pro</span>
+  <h1>Thiết kế database e-learning — cấp PRO (chuẩn hóa, khóa ngoại nâng cao, index)</h1>
+  <p class="subtitle">Nâng cấp ERD e-learning từ "3 bảng đúng" lên "schema production": chuẩn hóa 1NF/2NF/3NF, ON DELETE/CASCADE, index &amp; EXPLAIN, JOIN + thống kê, timestamps, migration.</p>
+  <p class="meta-line">⏱ ~120 phút · 🎯 Mục tiêu: thiết kế schema e-learning đủ cho production — hiểu chuẩn hóa, chọn đúng ON DELETE, đặt index đúng chỗ, thống kê bằng GROUP BY/HAVING, và nghĩ tới migration/versioning.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 13 bạn đã có <strong>users → enrollments → courses</strong> chạy được, với khóa ngoại (REFERENCES), CHECK, UNIQUE tổ hợp và JOIN 3 bảng. Giờ bạn nhìn lại schema đó bằng <strong>mắt senior</strong>: dữ liệu lớn thì chậm ở đâu? Xóa khóa học thì enrollment ra sao? Thêm "bài giảng" (lessons) và "danh mục" (categories) thì chuẩn hóa thế nào? Đây là phần phân biệt "thiết kế cho chạy" với "thiết kế cho production".</p>
+  </div>
+
+  <h2>1. Nhìn lại schema cũ bằng mắt senior</h2>
+
+  <p>Schema bài 13 đúng về quan hệ nhưng vẫn còn 4 lỗ hổng production:</p>
+
+  <table class="data">
+    <thead><tr><th>Hạn chế</th><th>Hậu quả khi dữ liệu lớn</th><th>Bài này giải</th></tr></thead>
+    <tbody>
+      <tr><td>Khóa ngoại không có index</td><td>JOIN / lọc theo <code>user_id</code> quét cả bảng (Seq Scan)</td><td>Mục 5 — Index</td></tr>
+      <tr><td>Không nói rõ ON DELETE</td><td>Xóa course còn enrollment → lỗi mù mờ, không kiểm soát</td><td>Mục 4 — ON DELETE/CASCADE</td></tr>
+      <tr><td>Thiếu lessons, categories, instructor</td><td>Không mô hình được "khóa có bài giảng", "khóa thuộc danh mục"</td><td>Mục 3 — Schema mở rộng</td></tr>
+      <tr><td>Không có versioning schema</td><td>Thay đổi cấu trúc không tái lập được trên máy khác</td><td>Mục 8 — Migration/seed</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Điểm khác biệt của bài "PRO"</div>
+    <p>Bài 13 trả lời <em>"quan hệ là gì, khóa ngoại là gì"</em>. Bài 13-pro trả lời <em>"làm sao cho schema này chịu được production"</em>: nhanh (index), toàn vẹn (ON DELETE), mở rộng được (lessons/categories), và tái lập được (migration). Đây chính là tư duy mà bài 23 (TypeORM migrations) sẽ kế thừa.</p>
+  </div>
+
+  <h2>2. Chuẩn hóa dữ liệu — 1NF, 2NF, 3NF</h2>
+
+  <p>Bài 13 nói "tách bảng" một cách trực giác. Giờ ta đặt tên chính xác cho nó: <strong>chuẩn hóa (normalization)</strong> là quá trình bỏ trùng lặp theo từng bậc. Ba bậc đầu đủ cho hầu hết hệ thống:</p>
+
+  <table class="data">
+    <thead><tr><th>Bậc</th><th>Quy tắc</th><th>Vi phạm (ví dụ)</th><th>Cách sửa</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1NF</strong></td><td>Mỗi ô chỉ chứa 1 giá trị nguyên tử (không mảng, không chuỗi ngăn cách)</td><td>cột <code>tags</code> = <code>"nestjs,sql,design"</code></td><td>Tách bảng <code>tags</code> + bảng nối</td></tr>
+      <tr><td><strong>2NF</strong></td><td>Không phụ thuộc hàm riêng phần vào 1 phần của khóa tổ hợp</td><td>Bảng có khóa (user_id, course_id) mà <code>course_title</code> chỉ phụ thuộc course_id</td><td>Đưa <code>course_title</code> về bảng courses</td></tr>
+      <tr><td><strong>3NF</strong></td><td>Không phụ thuộc bắc cầu (cột không khóa phụ thuộc qua cột không khóa khác)</td><td>trong enrollments lưu <code>course_title</code> (qua course_id)</td><td>Chỉ lưu course_id, title nằm ở courses</td></tr>
+    </tbody>
+  </table>
+
+  <div class="code-block">
+    <span class="code-label">Ví dụ vi phạm 1NF → chuẩn hóa</span>
+<pre><code><span class="cmt">-- SAI (1NF): một cột chứa nhiều giá trị, không thể lọc "khóa có tag sql" bằng SQL sạch</span>
+<span class="kw">CREATE TABLE</span> courses (<span class="tbl">id</span> <span class="tbl">SERIAL PRIMARY KEY</span>, tags <span class="tbl">TEXT</span>);  <span class="cmt">-- tags = 'nestjs,sql'</span>
+
+<span class="cmt">-- ĐÚNG: tách bảng tags + bảng nối course_tags (nhiều-nhiều)</span>
+<span class="kw">CREATE TABLE</span> tags (<span class="tbl">id</span> <span class="tbl">SERIAL PRIMARY KEY</span>, name <span class="tbl">TEXT UNIQUE NOT NULL</span>);
+<span class="kw">CREATE TABLE</span> course_tags (
+  course_id <span class="tbl">INTEGER NOT NULL REFERENCES courses(id)</span>,
+  tag_id    <span class="tbl">INTEGER NOT NULL REFERENCES tags(id)</span>,
+  <span class="kw">PRIMARY KEY</span> (course_id, tag_id)
+);</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao chuẩn hóa quan trọng với senior?</div>
+    <p>Chuẩn hóa không phải lý thuyết suông — nó quyết định <strong>bạn có truy vấn được dữ liệu một cách tổng quát hay không</strong>. Vi phạm 1NF (nhét mảng vào 1 cột) thì "đếm khóa theo tag", "lọc khóa theo tag" thành cơn ác mộng. Đôi khi ta <em>cố ý</em> phá chuẩn (denormalize) vì hiệu năng — nhưng phải <strong>biết mình đang phá</strong> và đánh đổi gì. Đó là tư duy senior, không phải "chuẩn hóa bằng mọi giá".</p>
+  </div>
+
+  <h2>3. Schema e-learning mở rộng — đủ cho production</h2>
+
+  <p>ERD đầy đủ hơn cho e-learning — thêm <code>categories</code> (danh mục), <code>lessons</code> (bài giảng), và liên kết <code>instructor</code> (giảng viên) trỏ tới chính bảng users:</p>
+
+  <div class="callout tip">
+    <div class="ct">🗺️ ERD mở rộng — users đóng 2 vai trò (học viên &amp; giảng viên)</div>
+    <pre>
+categories 1 ── * courses 1 ── * lessons
+                 │  1
+                 │  * enrollments * ── 1 users
+                 │
+                 └── instructor_id ──&gt; users (SET NULL)
+    </pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Bảng</th><th>Vai trò</th><th>Cột chính</th></tr></thead>
+    <tbody>
+      <tr><td><code>categories</code></td><td>Danh mục khóa (Backend, Database…)</td><td>id, name, slug UNIQUE</td></tr>
+      <tr><td><code>courses</code></td><td>Khóa học</td><td>id, title, price, description, category_id, instructor_id, created_at…</td></tr>
+      <tr><td><code>lessons</code></td><td>Bài giảng thuộc 1 khóa (1-nhiều)</td><td>id, course_id FK, title, position, duration</td></tr>
+      <tr><td><code>enrollments</code></td><td>Học viên đăng ký khóa (nhiều-nhiều)</td><td>user_id FK, course_id FK, enrolled_at</td></tr>
+    </tbody>
+  </table>
+
+  <p>Điểm tinh tế: <strong>users đóng hai vai trò</strong>. Một user có thể là học viên (qua enrollments) <em>và</em> là giảng viên (qua courses.instructor_id). Ta không tạo bảng <code>instructors</code> riêng — chỉ trỏ khóa ngoại về users. Khi nào quyết định tách bảng mới? Khi instructor có <strong>thuộc tính riêng</strong> (bio, rating, số khóa…). Chưa cần thì chưa tách.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — thêm categories + lessons, mở rộng courses</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE TABLE categories (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE
+);"</span>
+
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE TABLE lessons (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  duration_minutes INTEGER
+);"</span>
+
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"ALTER TABLE courses
+  ADD COLUMN category_id INTEGER REFERENCES categories(id),
+  ADD COLUMN instructor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;"</span></code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Đọc kỹ hai lựa chọn ở đây</div>
+    <p><code>lessons.course_id ... ON DELETE CASCADE</code> — xóa khóa thì <strong>xóa luôn bài giảng</strong> (bài giảng không thể tồn tại nếu không có khóa). Nhưng <code>courses.instructor_id ... ON DELETE SET NULL</code> — xóa giảng viên thì <strong>giữ khóa</strong>, chỉ bỏ tham chiếu về NULL. Vì sao khác nhau? Mục tiếp theo.</p>
+  </div>
+
+  <h2>4. ON DELETE / ON UPDATE — kiểm soát toàn vẹn khi xóa</h2>
+
+  <p>Theo <a href="https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK" target="_blank">PostgreSQL docs</a>, khóa ngoại có thể khai báo hành động khi dòng cha bị <code>DELETE</code>/<code>UPDATE</code>. Ba lựa chọn chính:</p>
+
+  <table class="data">
+    <thead><tr><th>Hành động</th><th>Khi xóa dòng cha</th><th>Dùng khi</th></tr></thead>
+    <tbody>
+      <tr><td><code>RESTRICT</code> (mặc định)</td><td>Chặn xóa — báo lỗi nếu còn dòng con tham chiếu</td><td>Không muốn mất dữ liệu "ngoài ý muốn"</td></tr>
+      <tr><td><code>CASCADE</code></td><td>Xóa luôn các dòng con</td><td>Dòng con không có ý nghĩa nếu cha mất (lessons của course)</td></tr>
+      <tr><td><code>SET NULL</code></td><td>Giữ dòng con, bỏ khóa ngoại về NULL</td><td>Dòng con vẫn có giá trị dù cha mất (course khi instructor bị xóa)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — thử 3 hành vi (sau khi đã ALTER ở mục 3)</span>
+<pre><code><span class="cmt"># 1) RESTRICT (mặc định): course 1 còn enrollment -> database CHẶN xóa</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"DELETE FROM courses WHERE id = 1;"</span>
+<span class="cmt"># ERROR: update or delete on table "courses" violates foreign key constraint ... on table "enrollments"</span>
+
+<span class="cmt"># 2) CASCADE: thêm 1 lesson cho course 2, rồi xóa course 2 -> lesson bay theo</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"INSERT INTO lessons (course_id, title, position) VALUES (2, 'Mở đầu', 1);"</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"DELETE FROM courses WHERE id = 2;"</span>
+<span class="cmt"># DELETE 1 — và lesson của course 2 cũng bị xóa (CASCADE)</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao chọn đúng ON DELETE là kỹ năng senior?</div>
+    <p>Chọn sai nghĩa là hoặc <strong>mất dữ liệu</strong> (CASCADE quá tay) hoặc <strong>kẹt dữ liệu</strong> (RESTRICT quá chặt, không xóa được gì vì mắc ràng buộc). Quy tắc ghi nhớ: <em>"dòng con sống được thiếu cha không?"</em> — sống được → SET NULL hoặc RESTRICT; không sống được → CASCADE. Với tiền bạc (orders, payments) thì hầu như luôn RESTRICT: bạn không bao giờ muốn xóa user kéo theo xóa lịch sử thanh toán.</p>
+  </div>
+
+  <h2>5. Index — vì sao, khi nào, và kiểm tra bằng EXPLAIN</h2>
+
+  <p>Bài 13 chưa nói tới: <strong>khóa chính tự có index, nhưng cột khóa ngoại thì KHÔNG</strong>. Khi enrollments có hàng triệu dòng, truy vấn "khóa học của user 1" sẽ quét toàn bảng — chậm dần theo cấp số nhân. Index giúp PostgreSQL nhảy thẳng tới đúng dòng.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — thấy Seq Scan rồi biến thành Index Scan</span>
+<pre><code><span class="cmt"># 1) Xem kế hoạch truy vấn — chưa có index trên user_id</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"EXPLAIN ANALYZE SELECT * FROM enrollments WHERE user_id = 1;"</span>
+<span class="cmt"># Seq Scan on enrollments (cost=...) — đọc TUẦN TỰ cả bảng</span>
+
+<span class="cmt"># 2) Tạo index cho cột khóa ngoại</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"CREATE INDEX idx_enrollments_user_id ON enrollments(user_id);"</span>
+
+<span class="cmt"># 3) Chạy lại EXPLAIN -> Index Scan — chỉ đọc vài dòng khớp</span>
+<span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"EXPLAIN ANALYZE SELECT * FROM enrollments WHERE user_id = 1;"</span></code></pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Khi nào tạo index</th><th>Khi nào chưa cần</th></tr></thead>
+    <tbody>
+      <tr><td>Cột khóa ngoại (JOIN / lọc thường xuyên)</td><td>Bảng nhỏ, vài trăm dòng (Seq Scan nhanh hơn)</td></tr>
+      <tr><td>Cột trong WHERE/ORDER BY thường xuyên</td><td>Cột ít được lọc, bảng bị ghi nhiều (mỗi index làm INSERT chậm thêm)</td></tr>
+      <tr><td>Cột có UNIQUE constraint (PG tự tạo index)</td><td>Đoán mò — index không miễn phí: tốn dung lượng + chậm ghi</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <div class="ct">🧠 Mẹo senior</div>
+    <p>Đừng đánh index tràn lan từ đầu. Hãy để <strong>EXPLAIN ANALYZE</strong> lên tiếng trước: thấy <code>Seq Scan</code> trên bảng lớn trong câu truy vấn hay gọi → mới thêm index. Index là đánh đổi giữa đọc nhanh và ghi chậm — đúng tinh thần "ra quyết định có lý do" của senior.</p>
+  </div>
+
+  <h2>6. JOIN nâng cao — LEFT JOIN + GROUP BY/HAVING</h2>
+
+  <p>Bài 13 JOIN để trả lời "user học khóa nào". Senior còn trả lời <strong>câu hỏi thống kê</strong>: "khóa nào đông học viên nhất", "khóa nào chưa ai học". Cần <code>LEFT JOIN</code> + <code>GROUP BY</code> + <code>HAVING</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — đếm học viên từng khóa (kể cả khóa 0 người)</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"SELECT c.title, COUNT(e.user_id) AS so_hoc_vien
+FROM courses c
+LEFT JOIN enrollments e ON e.course_id = c.id
+GROUP BY c.id, c.title
+ORDER BY so_hoc_vien DESC;"</span></code></pre>
+  </div>
+
+  <p>Vì sao <code>LEFT JOIN</code> chứ không phải <code>JOIN</code> (INNER)? Vì <code>JOIN</code> chỉ giữ khóa <em>có</em> enrollment — khóa chưa ai đăng ký bị biến mất khỏi kết quả. <code>LEFT JOIN</code> giữ toàn bộ courses bên trái, khóa nào không có enrollment thì <code>COUNT</code> trả 0.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — khóa nào CHƯA có học viên (HAVING)</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"SELECT c.title, COUNT(e.user_id) AS so_hoc_vien
+FROM courses c
+LEFT JOIN enrollments e ON e.course_id = c.id
+GROUP BY c.id, c.title
+HAVING COUNT(e.user_id) = 0;"</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 WHERE vs HAVING — lỗi phổ biến của junior</div>
+    <p><code>WHERE</code> lọc <strong>từng dòng trước khi gộp</strong>; <code>HAVING</code> lọc <strong>kết quả sau khi GROUP BY</strong>. Bạn không thể viết <code>WHERE COUNT(...) = 0</code> — vì lúc WHERE chạy thì COUNT chưa tồn tại. Đây là câu hỏi phỏng vấn kinh điển.</p>
+  </div>
+
+  <h2>7. Timestamps, soft delete &amp; khóa thay thế</h2>
+
+  <p>Ba thói quen giúp schema "production-ready":</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — thêm cột quản trị</span>
+<pre><code><span class="tbl">docker</span> exec -it elearning-postgres psql -U elearning -d elearning -c <span class="str">"ALTER TABLE courses
+  ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN deleted_at TIMESTAMPTZ;"</span></code></pre>
+  </div>
+
+  <ul>
+    <li><strong>created_at / updated_at</strong> — biết khi nào tạo/sửa; updated_at thường phải cập nhật bằng trigger hoặc code (bài sau bàn TypeORM tự làm).</li>
+    <li><strong>Soft delete (deleted_at)</strong> — thay vì DELETE vĩnh viễn, đánh dấu thời điểm xóa. Truy vấn chỉ lọc <code>WHERE deleted_at IS NULL</code>. Lợi: khôi phục được, giữ lịch sử. Đây là lý do người ta chọn SET NULL/RESTRICT thay vì CASCADE cho dữ liệu quan trọng.</li>
+    <li><strong>Khóa thay thế (surrogate key)</strong> — <code>SERIAL id</code> là khóa thay thế, không mang ý nghĩa nghiệp vụ. Đối lập với <strong>khóa tự nhiên</strong> (vd email làm khóa). Quy tắc: khóa chính nên là surrogate (ổn định, không bao giờ đổi), khóa tự nhiên đặt UNIQUE riêng (vd email) — đúng như users của bạn.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Soft delete có cái giá của nó</div>
+    <p>Mọi câu truy vấn từ nay phải nhớ thêm <code>deleted_at IS NULL</code>, và unique constraint (email) sẽ xung đột khi tạo lại bản ghi cùng email đã xóa. Đừng áp dụng soft delete vô tội vạ — chỉ dùng cho dữ liệu cần khôi phục hoặc giữ lịch sử (users, courses, orders), không dùng cho bảng trung gian như enrollments.</p>
+  </div>
+
+  <h2>8. Migration &amp; seed — schema phải tái lập được</h2>
+
+  <p>Cho tới giờ bạn chạy lệnh <code>CREATE TABLE</code> tay. Vấn đề: đồng nghiệp clone code về, hay deploy máy mới — làm sao tái lập đúng schema? Câu trả lời là <strong>migration</strong>: mỗi thay đổi schema là một file được version, chạy theo thứ tự. Seed là file dữ liệu mẫu ban đầu.</p>
+
+  <div class="code-block">
+    <span class="code-label">Tư duy migration (chưa cần tool — bài 23 dùng TypeORM)</span>
+<pre><code><span class="cmt">-- migrations/002_add_categories_lessons.sql  (mỗi thay đổi 1 file, chạy theo thứ tự)</span>
+<span class="kw">CREATE TABLE</span> categories ( id <span class="tbl">SERIAL PRIMARY KEY</span>, name <span class="tbl">TEXT NOT NULL</span>, slug <span class="tbl">TEXT NOT NULL UNIQUE</span> );
+
+<span class="cmt">-- seed/01_categories.sql (dữ liệu mẫu, chạy sau migration)</span>
+<span class="kw">INSERT INTO</span> categories (name, slug) <span class="kw">VALUES</span> ('Backend', 'backend'), ('Database', 'database');</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Migration = "git cho schema"</div>
+    <p>Code bạn dùng git để version; <strong>schema database cũng cần version</strong> — không thì không ai biết bảng <code>lessons</code> được thêm khi nào, và không tái lập được môi trường giống nhau. Đây là mục lớn ở bài 23 (TypeORM migrations) — giờ bạn chỉ cần nhớ nguyên tắc: <em>không bao giờ sửa schema bằng tay trên production</em>, luôn qua migration.</p>
+  </div>
+
+  <h2>9. Tổng kết — bạn vừa đạt được</h2>
+
+  <ul class="checklist">
+    <li>Đọc được hạn chế của schema cơ bản bằng mắt senior (index, ON DELETE, mở rộng, versioning)</li>
+    <li>Hiểu và áp dụng chuẩn hóa 1NF/2NF/3NF (kể cả khi cố ý phá chuẩn)</li>
+    <li>Mở rộng schema: categories, lessons, instructor — users đóng 2 vai trò</li>
+    <li>Chọn đúng ON DELETE: RESTRICT / CASCADE / SET NULL theo nghiệp vụ</li>
+    <li>Tạo index cho khóa ngoại và chứng minh bằng EXPLAIN ANALYZE</li>
+    <li>Thống kê bằng LEFT JOIN + GROUP BY + HAVING (phân biệt WHERE/HAVING)</li>
+    <li>Áp dụng timestamps, soft delete, khóa thay thế đúng chỗ</li>
+    <li>Nắm nguyên tắc migration/seed — nền cho TypeORM ở bài 23</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao cột khóa ngoại <code>enrollments.user_id</code> cần index riêng?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! PRIMARY KEY tự có index, nhưng cột khóa ngoại thì không. Thiếu index khiến lọc/JOIN theo user_id phải Seq Scan cả bảng — chậm theo cấp số nhân khi dữ liệu lớn.">A. Khóa chính tự có index, còn khóa ngoại thì không — thiếu index thì lọc/JOIN phải quét cả bảng</button>
+    <button class="opt" data-correct="false" data-explain="Sai — PostgreSQL KHÔNG tự đánh index cho cột khóa ngoại. Bạn phải tạo thủ công khi cần.">B. PostgreSQL tự đánh index cho mọi cột khóa ngoại</button>
+    <button class="opt" data-correct="false" data-explain="Sai — index cũng rất cần cho cột khóa ngoại (JOIN/lọc thường xuyên), không chỉ cột PRIMARY KEY.">C. Chỉ cột PRIMARY KEY mới cần index</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. <code>ON DELETE CASCADE</code> khác <code>ON DELETE SET NULL</code> thế nào?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — đây là mô tả của SET NULL (giữ dòng con, bỏ tham chiếu về NULL). CASCADE xóa luôn dòng con.">B. CASCADE giữ dòng con, SET NULL xóa luôn dòng con</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! CASCADE xóa luôn dòng con (dùng khi con không sống được thiếu cha, vd lessons của course). SET NULL giữ dòng con, chỉ bỏ khóa ngoại về NULL (vd course khi instructor bị xóa).">A. CASCADE xóa luôn dòng con; SET NULL giữ dòng con và bỏ tham chiếu về NULL</button>
+    <button class="opt" data-correct="false" data-explain="Sai — hai cái có hành vi hoàn toàn khác nhau, không tương đương.">C. Hai cái giống nhau, chỉ khác tên</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. <code>WHERE</code> và <code>HAVING</code> khác nhau ở điểm nào?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — WHERE chạy trước khi gộp, HAVING chạy sau khi GROUP BY. Vì vậy không thể dùng COUNT(...) trong WHERE.">B. WHERE lọc sau khi GROUP BY, HAVING lọc trước</button>
+    <button class="opt" data-correct="false" data-explain="Sai — chúng có vai trò khác nhau, không thể hoán đổi.">C. Dùng cái nào cũng được</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! WHERE lọc từng dòng TRƯỚC khi gộp; HAVING lọc kết quả SAU khi GROUP BY. Muốn lọc theo hàm gộp (COUNT, SUM…) phải dùng HAVING.">A. WHERE lọc từng dòng trước khi gộp; HAVING lọc sau GROUP BY (mới dùng được COUNT/SUM)</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>10. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn vừa nâng schema e-learning lên tầm production: chuẩn hóa, ON DELETE có chủ đích, index có lý do, thống kê bằng GROUP BY, và tư duy migration. Tiếp theo là <strong>auth</strong> — hệ thống đăng ký thật cần xác thực người dùng trước khi đụng vào enrollments: ai được tạo khóa, ai mua khóa, mật khẩu hash sao cho an toàn. Bài 14 làm auth cơ bản bằng Express — bcrypt hash mật khẩu, JWT tạo token — và bắt lỗi email trùng (409) nhờ chính UNIQUE mà bạn đã hiểu ở đây.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 14 · Auth cơ bản bằng Express — bcrypt, JWT</div>
+    <p class="nd">Đăng ký/đăng nhập với mật khẩu hash (bcrypt) và token (JWT) — xương sống bảo mật của mọi hệ thống.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0013-thiet-ke-database-elearning.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="0014-auth-express-bcrypt-jwt.html">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm theo bài trên máy thật: (1) tạo categories + lessons và ALTER courses thêm category_id/instructor_id; (2) thử DELETE course 1 (bị RESTRICT chặn) rồi DELETE course 2 (lesson bay theo CASCADE); (3) chạy EXPLAIN trước/sau khi CREATE INDEX, ghi lại Seq Scan → Index Scan; (4) chạy LEFT JOIN + GROUP BY đếm học viên từng khóa. Gửi tôi output — tôi sẽ kiểm tra bạn chọn đúng ON DELETE, đặt index đúng chỗ, và phân biệt được WHERE/HAVING. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
