@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 15 · Tổng kết Express — e-learning chạy bằng Express thuần</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 2 · Bài 15</span>
+  <h1>Tổng kết Express — e-learning chạy bằng Express thuần</h1>
+  <p class="subtitle">Gom toàn bộ: CRUD users, courses, enrollments, auth — thành một API e-learning hoàn chỉnh chạy bằng Express + PostgreSQL.</p>
+  <p class="meta-line">⏱ ~90 phút · 🎯 Mục tiêu: dự án e-learning có đủ users → courses → enrollments (nhiều-nhiều qua bảng trung gian), đăng ký/đăng nhập JWT, và route bảo vệ — verify bằng curl.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 10-11 bạn có Express + middleware, bài 12 có users CRUD + PostgreSQL, bài 13 có database courses/enrollments + JOIN, bài 14 có auth (bcrypt + JWT). Bài 15 <strong>gom tất cả</strong>: biến các mảnh rời rạc thành một API e-learning chạy được — từ database có quan hệ tới route được bảo vệ.</p>
+  </div>
+
+  <h2>1. Nhìn lại — 5 bài toán Express đã giải</h2>
+
+  <p>Qua 6 bài (Bài 10-15), bạn đã xây dựng đủ mọi mảnh của một API thực tế. Tổng kết theo đúng 5 bài toán từ bài 09:</p>
+
+  <table class="data">
+    <thead><tr><th>Bài toán</th><th>Bạn đã dùng (API Express)</th><th>Bài học</th></tr></thead>
+    <tbody>
+      <tr><td>Routing</td><td><code>app.get/post/put/delete</code> + <code>:id</code></td><td>10</td></tr>
+      <tr><td>Query + Body</td><td><code>req.query</code>, <code>express.json()</code> → <code>req.body</code></td><td>10</td></tr>
+      <tr><td>Middleware</td><td><code>express.json()</code>, log tự viết, error-handling 4 tham số, CORS</td><td>10, 11</td></tr>
+      <tr><td>Database</td><td><code>pg.Pool</code> + SQL thật, parameterized query</td><td>12, 13</td></tr>
+      <tr><td>Auth</td><td>bcrypt hash, JWT sign/verify, middleware <code>auth</code></td><td>14</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Điểm cốt lõi bài 15</div>
+    <p>Sau bài này, dự án e-learning của bạn <strong>chạy được thật</strong>: có database quan hệ (users ↔ enrollments ↔ courses), có đăng ký/đăng nhập, và có route được bảo vệ (chỉ user đăng nhập mới tạo khóa, đăng ký khóa, xem khóa của mình). Từ đây lên NestJS (Module 4) chỉ là "đóng gói lại" những gì bạn đã hiểu.</p>
+  </div>
+
+  <h2>2. Sơ đồ API e-learning</h2>
+
+  <p>Toàn bộ endpoint của dự án bài 15 (đã verify XANH):</p>
+
+  <table class="data">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Mô tả</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td><code>/api/auth/register</code></td><td>—</td><td>Đăng ký (hash bcrypt) → trả user + token</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/login</code></td><td>—</td><td>Đăng nhập → trả token</td></tr>
+      <tr><td>GET</td><td><code>/api/me</code></td><td>✅</td><td>Thông tin user đang đăng nhập</td></tr>
+      <tr><td>GET</td><td><code>/api/users</code></td><td>—</td><td>Danh sách users (bài 12)</td></tr>
+      <tr><td>GET</td><td><code>/api/courses</code></td><td>—</td><td>Danh sách khóa học (bài 13)</td></tr>
+      <tr><td>POST</td><td><code>/api/courses</code></td><td>✅</td><td>Tạo khóa học (mới)</td></tr>
+      <tr><td>POST</td><td><code>/api/enrollments</code></td><td>✅</td><td>Đăng ký khóa (mới)</td></tr>
+      <tr><td>GET</td><td><code>/api/me/courses</code></td><td>✅</td><td>Khóa học của tôi (JOIN) (mới)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Thêm CRUD courses + enrollments vào server.ts</h2>
+
+  <p>Bạn đã có users (bài 12) + auth (bài 14) trong <code>src/server.ts</code>. Giờ thêm 3 route mới để hoàn thiện nghiệp vụ: tạo khóa, đăng ký khóa, xem khóa của mình. Đây là phần <strong>mới</strong> của bài 15 — dùng middleware <code>auth</code> đã có và bảng đã tạo ở bài 13.</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm route courses (cần auth)</span>
+<pre><code><span class="cmt">// GET /api/courses — danh sách khóa học (public)</span>
+app.<span class="fn">get</span>(<span class="str">'/api/courses'</span>, <span class="kw">async</span> (req: Request, res: Response) => {
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(<span class="str">'SELECT * FROM courses ORDER BY id'</span>)
+  res.<span class="fn">json</span>(rows)
+})
+
+<span class="cmt">// POST /api/courses — tạo khóa (CHỈ user đăng nhập)</span>
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, auth, <span class="kw">async</span> (req: Request, res: Response) => {
+  <span class="kw">const</span> { title, price, description } = req.body ?? {}
+  <span class="kw">if</span> (!title) {
+    res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'title là bắt buộc'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+    <span class="str">'INSERT INTO courses (title, price, description) VALUES ($1, $2, $3) RETURNING *'</span>,
+    [title, price ?? <span class="num">0</span>, description ?? <span class="kw">null</span>],
+  )
+  res.<span class="fn">status</span>(<span class="num">201</span>).<span class="fn">json</span>(rows[<span class="num">0</span>])
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao POST /api/courses cần auth?</div>
+    <p>Chỉ người dùng đã đăng nhập mới được tạo khóa. Middleware <code>auth</code> (bài 14) đặt trước handler — không có token hợp lệ → 401, không tới được code tạo khóa. Đây là discipline: route nhạy cảm luôn được bảo vệ. (Sau này Module 5 sẽ phân quyền admin/teacher/student — ai được tạo khóa.)</p>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm route enrollments + me/courses (cần auth)</span>
+<pre><code><span class="cmt">// POST /api/enrollments — đăng ký khóa (CHỈ user đăng nhập)</span>
+app.<span class="fn">post</span>(<span class="str">'/api/enrollments'</span>, auth, <span class="kw">async</span> (req: Request, res: Response) => {
+  <span class="kw">const</span> { course_id } = req.body ?? {}
+  <span class="kw">if</span> (!course_id) {
+    res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'course_id là bắt buộc'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">try</span> {
+    <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+      <span class="str">'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) RETURNING *'</span>,
+      [req.userId, course_id],
+    )
+    res.<span class="fn">status</span>(<span class="num">201</span>).<span class="fn">json</span>(rows[<span class="num">0</span>])
+  } <span class="kw">catch</span> (e: any) {
+    <span class="kw">if</span> (e.code === <span class="str">'23505'</span>) { <span class="cmt">// UNIQUE (user_id, course_id)</span>
+      res.<span class="fn">status</span>(<span class="num">409</span>).<span class="fn">json</span>({ error: <span class="str">'Đã đăng ký khóa này rồi'</span> })
+      <span class="kw">return</span>
+    }
+    <span class="kw">if</span> (e.code === <span class="str">'23503'</span>) { <span class="cmt">// khóa ngoại</span>
+      res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'Khóa học không tồn tại'</span> })
+      <span class="kw">return</span>
+    }
+    <span class="kw">throw</span> e
+  }
+})
+
+<span class="cmt">// GET /api/me/courses — khóa học của tôi (JOIN enrollments + courses)</span>
+app.<span class="fn">get</span>(<span class="str">'/api/me/courses'</span>, auth, <span class="kw">async</span> (req: Request, res: Response) => {
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(
+    <span class="str">`SELECT c.id, c.title, e.enrolled_at
+     FROM enrollments e JOIN courses c ON c.id = e.course_id
+     WHERE e.user_id = $1 ORDER BY e.enrolled_at`</span>,
+    [req.userId],
+  )
+  res.<span class="fn">json</span>(rows)
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 JOIN "khóa của tôi" — áp dụng bài 13</div>
+    <p>Bài 13 bạn đã học JOIN để trả lời "user nào học khóa nào". Giờ áp dụng vào API: <code>FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE e.user_id = $1</code> — JOIN enrollments với courses qua khóa ngoại, lọc theo user đăng nhập lấy từ token (<code>req.userId</code>). Đây là nơi toàn bộ kiến thức bài 12-13-14 hội tụ.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ Bắt lỗi 23503 — khóa ngoại không tồn tại</div>
+    <p>Khi enroll course_id không có trong bảng courses, PostgreSQL ném lỗi <code>23503</code> (foreign key violation). Bắt và trả 400. Cùng với 23505 (trùng enrollment) → 409 ở bài 14, giờ bạn đã xử lý được đầy đủ lỗi database có chủ đích — kỹ năng senior.</p>
+  </div>
+
+  <h2>4. Chạy và test toàn bộ flow</h2>
+
+  <p>Chạy server rồi test đủ quy trình: đăng ký → đăng nhập → tạo khóa → đăng ký khóa → xem khóa của mình. (Đã verify XANH trên máy thật.)</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 1 — chạy server</span>
+<pre><code><span class="tbl">npm</span> run dev</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal 2 — curl toàn bộ flow</span>
+<pre><code><span class="cmt"># 1. Đăng ký → 201 + token</span>
+<span class="fn">curl</span> -X POST http://localhost:4000/api/auth/register \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"hocvien@ex.com","name":"Hoc Vien","password":"secret123"}'</span>
+
+<span class="cmt"># 2. Đăng nhập → lấy token (dán vào biến TOKEN)</span>
+<span class="fn">TOKEN</span>=<span class="fn">$(curl</span> -s -X POST http://localhost:4000/api/auth/login \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"email":"hocvien@ex.com","password":"secret123"}'</span> \
+  | <span class="fn">node</span> -e <span class="str">"process.stdin.on('data',d=>console.log(JSON.parse(d).token))"</span>)
+
+<span class="cmt"># 3. Xem danh sách khóa (public)</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/courses
+
+<span class="cmt"># 4. Tạo khóa (cần token) → 201</span>
+<span class="fn">curl</span> -X POST http://localhost:4000/api/courses \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -H <span class="str">"Authorization: Bearer $TOKEN"</span> \
+  -d <span class="str">'{"title":"Express tong ket","price":400000}'</span>
+
+<span class="cmt"># 5. Tạo khóa KHÔNG token → 401</span>
+<span class="fn">curl</span> -X POST http://localhost:4000/api/courses \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"title":"Bi chan"}'</span>
+
+<span class="cmt"># 6. Đăng ký khóa id=1 (cần token) → 201</span>
+<span class="fn">curl</span> -X POST http://localhost:4000/api/enrollments \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -H <span class="str">"Authorization: Bearer $TOKEN"</span> \
+  -d <span class="str">'{"course_id":1}'</span>
+
+<span class="cmt"># 7. Xem khóa của tôi (JOIN) → trả khóa đã đăng ký</span>
+<span class="fn">curl</span> -s http://localhost:4000/api/me/courses \
+  -H <span class="str">"Authorization: Bearer $TOKEN"</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Kết quả đã kiểm chứng (Node 24, Express 5.2.1, bcrypt 6, JWT 9, PostgreSQL 16)</div>
+    <p>Đã chạy thật: register → 201 + token; login → token; GET /api/courses trả 2 khóa; POST /api/courses có token → 201 <code>{id:3, title:"Express tong ket", ...}</code>; POST không token → 401 <code>{"error":"Thiếu token"}</code>; POST /api/enrollments → 201; GET /api/me/courses → trả khóa đã đăng ký (vd "NestJS cơ bản"). Toàn bộ XANH.</p>
+  </div>
+
+  <h2>5. Tổng kết — bạn vừa đạt được Project 1 hoàn chỉnh</h2>
+
+  <ul class="checklist">
+    <li>Gom 5 bài toán Express + PostgreSQL + auth thành một API e-learning chạy được</li>
+    <li>Thêm CRUD courses (public GET, protected POST)</li>
+    <li>Thêm enrollments (protected POST, bắt lỗi 23505/23503)</li>
+    <li>Route "khóa của tôi" dùng JOIN enrollments + courses (áp dụng bài 13)</li>
+    <li>Route nhạy cảm được bảo vệ bằng middleware auth — discipline cơ bản của backend</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao POST /api/courses cần middleware auth, còn GET /api/courses thì không?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Tạo khóa là hành động có tác động (ghi dữ liệu) — chỉ user đăng nhập được làm. Xem danh sách là public (ai cũng xem được).">A. Tạo khóa ghi dữ liệu (nhạy cảm) — chỉ user đăng nhập được; xem khóa là public</button>
+    <button class="opt" data-correct="false" data-explain="Sai — auth không liên quan tốc độ; nó là kiểm soát quyền truy cập.">B. Để POST chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai đều dùng database; khác nhau là quyền truy cập, không phải database.">C. Vì POST dùng database còn GET thì không</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Query "khóa của tôi" dùng JOIN enrollments với courses. Ý nghĩa?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — JOIN qua khóa ngoại course_id, không phải user_id.">B. Nối qua user_id để lấy mọi khóa của mọi user</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! JOIN enrollments (có user_id, course_id) với courses (có title) qua c.id = e.course_id, lọc WHERE e.user_id = $1 — trả khóa mà user này đã đăng ký.">A. Nối enrollments với courses qua course_id, lọc theo user_id — trả khóa user đã đăng ký</button>
+    <button class="opt" data-correct="false" data-explain="Sai — JOIN không lọc theo user; WHERE mới lọc.">C. JOIN tự động lọc chỉ khóa của user hiện tại mà không cần WHERE</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Bắt lỗi 23503 trong POST /api/enrollments có ý nghĩa gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — 23503 là khóa ngoại không tồn tại, không phải trùng lặp.">B. Chặn user đăng ký trùng khóa</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! 23503 (foreign key violation) xảy ra khi course_id không tồn tại trong bảng courses — database chặn, ta trả 400 thay vì 500.">A. Trả 400 khi course_id không tồn tại (khóa ngoại) thay vì 500</button>
+    <button class="opt" data-correct="false" data-explain="Sai — 23503 không phải lỗi mật khẩu; đó là lỗi constraint database.">C. Bắt lỗi mật khẩu sai khi đăng nhập</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>6. Câu hỏi tư duy (bắc cầu sang Module 3 — TypeScript)</h2>
+  <p>Bạn đã build được API Express hoàn chỉnh nối PostgreSQL. Nhưng đối chiếu lại, type của bạn phần lớn dùng <code>any</code> (req.body, error...) — viết nhiều route thì dễ sai. NestJS (mục tiêu) xây trên <strong>TypeScript</strong> để type an toàn, đặc biệt <strong>decorators</strong> là nền tảng DI. Bài 16 sẽ bắt đầu Module 3 — TypeScript cơ bản (type, interface, generics), rồi dần chuyển dự án này lên NestJS.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 16 · TypeScript cơ bản — type, interface, generics</div>
+    <p class="nd">Mở Module 3: học TypeScript từ nền tảng — thứ NestJS xây trên đó, và là cầu nối để type an toàn hơn cho dự án e-learning.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0014-auth-express-bcrypt-jwt.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Thêm 3 route (courses POST, enrollments, me/courses) vào <code>src/server.ts</code>, chạy và test đủ 7 lệnh curl, gửi tôi output. Tôi sẽ kiểm tra bạn hiểu vì sao route nhạy cảm cần auth, vì sao bắt 23505/23503, và cách JOIN "khóa của tôi". Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
