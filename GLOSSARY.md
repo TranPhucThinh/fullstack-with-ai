@@ -100,3 +100,6 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **error 23505 → 409** | Bắt mã lỗi UNIQUE của PostgreSQL (email trùng) và trả 409 Conflict thay vì 500 — xử lý lỗi database có chủ đích | 14 |
 | **status 401 Unauthorized** | Lỗi chưa xác thực: thiếu token, token sai/hết hạn, hoặc sai email/mật khẩu — trả chung một thông điệp để chống user enumeration | 14 |
 | **module augmentation** | Kỹ thuật TS mở rộng type có sẵn của thư viện (vd thêm `Express.Request.userId`) qua file `.d.ts` + `declare global` — không sửa code thư viện | 14 |
+| **protected route** | Route được bảo vệ bằng middleware `auth` — chỉ chạy khi có token JWT hợp lệ; không token → 401 | 15 |
+| **error 23503** | Mã lỗi PostgreSQL vi phạm khóa ngoại (REFERENCES) — vd enroll course_id không tồn tại; bắt và trả 400 thay vì 500 | 15 |
+| **JOIN qua bảng trung gian (ứng dụng)** | Áp dụng JOIN để trả "khóa của tôi": nối enrollments với courses qua course_id, lọc theo user_id từ token — research nghiệp vụ nhiều-nhiều | 15 |

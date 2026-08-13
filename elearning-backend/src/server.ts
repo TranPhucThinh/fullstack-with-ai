@@ -102,6 +102,64 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
   else res.status(204).end()
 })
 
+// GET /api/courses — danh sách khóa học (public)
+app.get('/api/courses', async (req: Request, res: Response) => {
+  const { rows } = await pool.query('SELECT * FROM courses ORDER BY id')
+  res.json(rows)
+})
+
+// POST /api/courses — tạo khóa (CHỈ user đăng nhập)
+app.post('/api/courses', auth, async (req: Request, res: Response) => {
+  const { title, price, description } = req.body ?? {}
+  if (!title) {
+    res.status(400).json({ error: 'title là bắt buộc' })
+    return
+  }
+  const { rows } = await pool.query(
+    'INSERT INTO courses (title, price, description) VALUES ($1, $2, $3) RETURNING *',
+    [title, price ?? 0, description ?? null],
+  )
+  res.status(201).json(rows[0])
+})
+
+// POST /api/enrollments — đăng ký khóa (CHỈ user đăng nhập)
+app.post('/api/enrollments', auth, async (req: Request, res: Response) => {
+  const { course_id } = req.body ?? {}
+  if (!course_id) {
+    res.status(400).json({ error: 'course_id là bắt buộc' })
+    return
+  }
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) RETURNING *',
+      [req.userId, course_id],
+    )
+    res.status(201).json(rows[0])
+  } catch (error: any) {
+    if (error.code === '23505') {
+      res.status(409).json({ error: 'Đã đăng ký khóa này rồi' })
+      return
+    }
+    if (error.code === '23503') {
+      res.status(400).json({ error: 'Khóa học không tồn tại' })
+      return
+    }
+    throw error
+  }
+})
+
+// GET /api/me/courses — khóa học của tôi (JOIN enrollments + courses)
+app.get('/api/me/courses', auth, async (req: Request, res: Response) => {
+  const { rows } = await pool.query(
+    `SELECT c.id, c.title, e.enrolled_at
+    FROM enrollments e JOIN courses c ON c.id = e.course_id
+    WHERE e.user_id = $1 ORDER BY e.enrolled_at
+    `,
+    [req.userId],
+  )
+  res.json(rows)
+})
+
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   const { email, name, password } = req.body ?? {}
 
