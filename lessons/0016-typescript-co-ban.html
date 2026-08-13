@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 16 · TypeScript cơ bản — type, interface, generics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 3 · Bài 16</span>
+  <h1>TypeScript cơ bản — type, interface, generics</h1>
+  <p class="subtitle">Học TypeScript từ nền tảng: type alias, interface, union, generics — thứ NestJS xây trên đó, và là cầu nối để dự án e-learning type an toàn hơn.</p>
+  <p class="meta-line">⏱ ~60 phút · 🎯 Mục tiêu: viết được type/interface/generics, hiểu vì sao TS bắt lỗi type lúc compile, và áp dụng vào dự án e-learning (thay `any` bằng type đúng).</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Bài 15 bạn đã build API Express hoàn chỉnh, nhưng dùng nhiều <code>any</code> (req.body, error...) — viết nhiều route dễ sai. Bài 16 mở Module 3: <strong>TypeScript</strong> thêm type an toàn vào JavaScript. Bạn đã thấy TS hoạt động (tsx, tsconfig, typecheck) từ bài 00 — giờ học bản chất: type, interface, generics, là nền để hiểu NestJS (decorators, DI) ở Module 4.</p>
+  </div>
+
+  <h2>1. Vì sao TypeScript? — bắt lỗi type lúc compile</h2>
+
+  <p>JavaScript không có type: <code>req.body.title</code> có thể là <code>undefined</code>, <code>number</code>, hay bất cứ thứ gì — lỗi chỉ lộ ra lúc chạy. TypeScript thêm <strong>type annotation</strong> để trình biên dịch (tsc) bắt lỗi <strong>trước khi chạy</strong>. Theo <a href="https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html" target="_blank">TypeScript docs</a>: <em>"TypeScript is a strongly typed programming language that builds on JavaScript, giving you better tooling at any scale."</em></p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao quan trọng với bạn?</div>
+    <p>Bài 14 bạn đã tự fix lỗi type <code>userId</code> bằng <code>express.d.ts</code> — đó chính là TS. NestJS (mục tiêu) xây hoàn toàn trên TS: mọi Controller/Service/Entity đều có type. Hiểu TS là hiểu vì sao NestJS viết theo kiểu đó.</p>
+  </div>
+
+  <h2>2. Type alias — đặt tên cho kiểu</h2>
+
+  <p><code>type</code> cho phép đặt tên cho một kiểu, tái sử dụng nhiều nơi. Đặc biệt mạnh với <strong>union type</strong> (một trong nhiều giá trị):</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/ts16-verify.ts — type alias + union (đã verify XANH)</span>
+<pre><code><span class="cmt">// type alias: đặt tên cho kiểu number</span>
+<span class="kw">type</span> UserId = <span class="tbl">number</span>
+
+<span class="cmt">// union type: role chỉ được là 1 trong 3 giá trị — gán 'superadmin' sẽ lỗi compile</span>
+<span class="kw">type</span> Role = <span class="str">'admin'</span> | <span class="str">'teacher'</span> | <span class="str">'student'</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao union type hữu ích?</div>
+    <p>Thay vì <code>role: string</code> (chấp nhận mọi chuỗi, kể cả 'superadmin' sai), union <code>'admin' | 'teacher' | 'student'</code> giới hạn đúng tập giá trị. TS bắt lỗi ngay lúc gán sai — đây là nền cho <strong>enum/role</strong> trong NestJS (Module 5 RBAC).</p>
+  </div>
+
+  <h2>3. Interface — mô tả hình dạng object</h2>
+
+  <p><code>interface</code> mô tả "hình dạng" của một object — có những field nào, kiểu gì. Đây là cách chuẩn để định nghĩa entity trong NestJS:</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/ts16-verify.ts — interface User (đã verify XANH)</span>
+<pre><code><span class="cmt">// interface: mô tả object User — mọi field bắt buộc đúng kiểu</span>
+<span class="kw">interface</span> User {
+  id: <span class="tbl">UserId</span>      <span class="cmt">// dùng type alias đã định nghĩa</span>
+  email: <span class="tbl">string</span>
+  name: <span class="tbl">string</span>
+  role: <span class="tbl">Role</span>       <span class="cmt">// dùng union type</span>
+}
+
+<span class="kw">const</span> users: User[] = [
+  { id: <span class="num">1</span>, email: <span class="str">'a@ex.com'</span>, name: <span class="str">'An'</span>, role: <span class="str">'student'</span> },
+  { id: <span class="num">2</span>, email: <span class="str">'b@ex.com'</span>, name: <span class="str">'Binh'</span>, role: <span class="str">'teacher'</span> },
+]</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Interface vs type — khi nào dùng gì?</div>
+    <p>Theo <a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#differences-between-type-aliases-and-interfaces" target="_blank">TS docs</a>: interface dùng để mô tả <strong>object</strong> (có thể mở rộng bằng <code>extends</code>), type dùng cho <strong>union/alias</strong>. Quy ước phổ biến: object/entity dùng interface, union/alias dùng type. NestJS dùng interface cho DTO/Entity.</p>
+  </div>
+
+  <h2>4. Generics — hàm dùng chung cho nhiều kiểu</h2>
+
+  <p><strong>Generics</strong> (<code><T></code>) cho phép viết hàm/class dùng chung cho nhiều kiểu mà vẫn giữ type an toàn. Thay vì viết riêng cho từng kiểu, viết một lần với tham số kiểu <code>T</code>:</p>
+
+  <div class="code-block">
+    <span class="code-label">demo/ts16-verify.ts — generics (đã verify XANH)</span>
+<pre><code><span class="cmt">// Generics: T là tham số kiểu — hàm này dùng được cho MỌI mảng</span>
+<span class="kw">function</span> first<T>(arr: T[]): T | <span class="kw">undefined</span> {
+  <span class="kw">return</span> arr[<span class="num">0</span>]
+}
+
+<span class="kw">const</span> firstUser = <span class="fn">first</span>(users)   <span class="cmt">// T = User → firstUser: User | undefined</span>
+<span class="kw">const</span> firstNum = <span class="fn">first</span>([<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]) <span class="cmt">// T = number → firstNum: number | undefined</span>
+
+console.<span class="fn">log</span>(<span class="str">'firstUser:'</span>, firstUser?.name) <span class="cmt">// An</span>
+console.<span class="fn">log</span>(<span class="str">'firstNum:'</span>, firstNum) <span class="cmt">// 10</span></code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao generics quan trọng?</div>
+    <p>Nếu viết <code>first(arr: any[])</code>, bạn mất type an toàn (firstUser không biết là User). Generics giữ type: <code>first(users)</code> trả <code>User | undefined</code>, <code>first([10,20])</code> trả <code>number | undefined</code>. NestJS dùng generics khắp nơi (vd <code>Repository<User></code>, <code>Array<T></code>).</p>
+  </div>
+
+  <h2>5. Áp dụng vào dự án e-learning — thay `any` bằng type đúng</h2>
+
+  <p>Trong <code>src/server.ts</code> (bài 15), bạn dùng <code>req.body ?? {}</code> — TS không biết body có gì. Giờ định nghĩa interface cho body và dùng type an toàn:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — thêm interface cho body (áp dụng bài 16)</span>
+<pre><code><span class="cmt">// Interface mô tả body của POST /api/courses — TS bắt lỗi nếu thiếu field</span>
+<span class="kw">interface</span> CreateCourseBody {
+  title: <span class="tbl">string</span>
+  price?: <span class="tbl">number</span>   <span class="cmt">// optional — có thể không gửi</span>
+  description?: <span class="tbl">string</span>
+}
+
+<span class="cmt">// Dùng type an toàn thay vì req.body ?? {}</span>
+app.<span class="fn">post</span>(<span class="str">'/api/courses'</span>, auth, <span class="kw">async</span> (req: Request, res: Response) => {
+  <span class="kw">const</span> body = req.body <span class="kw">as</span> CreateCourseBody <span class="cmt">// ép kiểu body</span>
+  <span class="kw">if</span> (!body.title) {
+    res.<span class="fn">status</span>(<span class="num">400</span>).<span class="fn">json</span>({ error: <span class="str">'title là bắt buộc'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="cmt">// ...</span>
+})</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 `as` — ép kiểu (type assertion)</div>
+    <p><code>req.body as CreateCourseBody</code> nói với TS "tôi biết body có hình dạng này". Đây là bước đầu; bài 22 (DTO/ValidationPipe) sẽ làm validation thật sự ở runtime, không chỉ type. Nhưng đã an toàn hơn nhiều so với <code>any</code>.</p>
+  </div>
+
+  <h2>6. Tổng kết — bạn vừa đạt được</h2>
+
+  <ul class="checklist">
+    <li>Hiểu vì sao TypeScript — bắt lỗi type lúc compile, không phải lúc chạy</li>
+    <li>Viết type alias + union type (giới hạn tập giá trị)</li>
+    <li>Viết interface mô tả object (entity)</li>
+    <li>Viết generics — hàm dùng chung nhiều kiểu mà vẫn type an toàn</li>
+    <li>Áp dụng interface + `as` vào dự án e-learning thay `any`</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao dùng union type <code>type Role = 'admin' | 'teacher' | 'student'</code> thay vì <code>role: string</code>?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng! Union giới hạn đúng tập giá trị — gán 'superadmin' sẽ lỗi compile, chống lỗi do gõ sai.">A. Giới hạn role chỉ được là 1 trong 3 giá trị — TS bắt lỗi nếu gán sai</button>
+    <button class="opt" data-correct="false" data-explain="Sai — union không làm code chạy nhanh hơn; nó là type an toàn lúc compile.">B. Để code chạy nhanh hơn</button>
+    <button class="opt" data-correct="false" data-explain="Sai — union vẫn là string ở runtime; nó chỉ ràng buộc lúc compile.">C. Để role thành kiểu number</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Generics <code>function first<T>(arr: T[]): T | undefined</code> — gọi <code>first(users)</code> với users là User[] trả về kiểu gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — generics giữ type, không trả any.">B. any</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! T = User, nên trả User | undefined — TS biết chính xác kiểu, không mất type an toàn.">A. User | undefined</button>
+    <button class="opt" data-correct="false" data-explain="Sai — T là tham số kiểu, không phải number.">C. number | undefined</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. Interface dùng để làm gì trong NestJS?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — interface mô tả hình dạng object, không phải chạy code.">B. Để chạy logic nghiệp vụ</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Interface mô tả hình dạng object (field + kiểu) — dùng cho DTO/Entity trong NestJS.">A. Mô tả hình dạng object (field + kiểu) — dùng cho DTO/Entity</button>
+    <button class="opt" data-correct="false" data-explain="Sai — interface không kết nối database; TypeORM Entity mới làm việc đó.">C. Để kết nối database</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã có type/interface/generics. Nhưng NestJS còn dùng thứ mạnh hơn: <strong>decorators</strong> (<code>@Controller()</code>, <code>@Get()</code>) và <strong>utility types</strong> (<code>Partial<T></code>, <code>Pick<T></code>). Bài 17 — TS nâng cao — sẽ học decorators (nền tảng DI của NestJS) và utility types, rồi bài 18 chạy TS với Node, bài 19 cầu nối sang NestJS.</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 17 · TS nâng cao — decorators (nền tảng NestJS!), utility types</div>
+    <p class="nd">Học decorators — thứ biến TS thành NestJS — và utility types để viết type linh hoạt.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0015-tong-ket-express-elearning.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Tạo <code>demo/ts16-verify.ts</code> (code trong bài), chạy <code>npx tsx demo/ts16-verify.ts</code>, gửi tôi output. Sau đó áp dụng interface CreateCourseBody vào <code>src/server.ts</code> và gửi tôi code. Tôi sẽ kiểm tra bạn hiểu type/interface/generics và vì sao chúng quan trọng cho NestJS. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
