@@ -24,6 +24,12 @@
 - Điều này áp dụng cho MỌI package tương tự từ nay (pg, @types/pg, jest, bcrypt, jsonwebtoken, ...) — không phải giữ trạng thái "sạch" rồi bắt học viên tự cài.
 - Ghi verifier đã cài: `pg@8.23.0`, `@types/pg@8.21.0` (đã verify CRUD XANH trên PostgreSQL 16).
 
+## QUY ƯỚC MỚI — Tối ưu phiên/tiết kiệm token (học viên yêu cầu 16/08/2026) — TUYỆT ĐỐI KHÔNG NHẮC LẠI
+
+1. **Chấm bài KHÔNG verify thật.** Khi học viên báo xong: chỉ ĐỌC/KIỂM TRA các file code change (git diff/đọc code) để nhận xét. KHÔNG chạy typecheck/test/curl/server. Học viên TỰ chạy manual và tự chịu trách nhiệm; AI không cần xác nhận XANH.
+2. **Soạn bài mới CHỈ tạo file bài học mới** (`lessons/00NN-<slug>.html`). KHÔNG sửa/cập nhật bất kỳ file HTML cũ nào: **index.html, file bài cũ (navbar/next-box/teaser), cheat-sheet, link** — tất cả giữ nguyên. (Hệ quả chấp nhận: nav/index sẽ không cập nhật theo bài mới.)
+3. **Ghi nhớ vĩnh viễn** — học viên sẽ không nhắc lại; áp dụng cho MỌI phiên sau.
+
 ## Git workflow (người học yêu cầu 08/06/2026)
 - Repo: https://github.com/TranPhucThinh/fullstack-with-ai.git (branch `main`)
 - **Push TRƯỚC mỗi bài mới**: commit + push bài học cũ (kể cả code bài tập người học viết) trước khi soạn bài tiếp theo
@@ -49,5 +55,5 @@
 - ✅ **Bài 16 HOÀN THÀNH** (học viên tự thêm `interface CreateCourseBody` + `req.body as CreateCourseBody` vào src/server.ts; verify `npx tsc --noEmit` exit 0 + `tsx demo/ts16-verify.ts` XANH: type alias/union/interface/generics đúng; LR-0018 + GLOSSARY 5 thuật ngữ bài 16 đã ghi).
 - ✅ **Bài 17 HOÀN THÀNH** (học viên tự viết decorator `@time` đo thời gian bằng Date.now() vào src/ts17-decorators-demo.ts, chồng cùng @log; verify `npx tsc --noEmit` exit 0 + `tsx src/ts17-decorators-demo.ts` XANH: @time in ms đúng; LR-0019 + GLOSSARY 4 thuật ngữ bài 17 đã ghi; thêm experimentalDecorators vào tsconfig + cheat-sheet PostgreSQL/Auth/TS).
 - Lưu ý quan trọng: demo bài 17 đặt trong `src/` (không phải `demo/`) vì tsx tôn trọng `include` của tsconfig — file ngoài include không nhận experimentalDecorators.
-- Tiếp theo: soạn Bài 18 "Chạy TS với Node — tsx, tsconfig, build ra dist".
+- ✅ **Bài 18 ĐÃ SOẠN** (lessons/0018-chay-ts-voi-node.html; commit 52ab5a0 — kèm index.html + nav bài 17, làm trước khi có quy ước tối ưu phiên). CHỜ học viên làm: build dist, node dist/server.js, thêm 3 script typecheck/build/start:prod, thử tsx vs tsc --noEmit.
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).
