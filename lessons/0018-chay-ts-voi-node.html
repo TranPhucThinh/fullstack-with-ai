@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 18 · Chạy TypeScript với Node — tsx, tsconfig, build ra dist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 3 · Bài 18</span>
+  <h1>Chạy TypeScript với Node — tsx, tsconfig, build ra dist</h1>
+  <p class="subtitle">Node chỉ hiểu JavaScript — TypeScript phải được biên dịch. Phân biệt hai luồng: dev (<code>tsx</code>) và production (<code>tsc</code> build), rồi khai thác <code>tsconfig</code> đúng mức.</p>
+  <p class="meta-line">⏱ ~60 phút · 🎯 Mục tiêu: build được dự án ra <code>dist/</code> và chạy bằng <code>node</code>, thêm script <code>build</code>/<code>typecheck</code>/<code>start:prod</code> vào package.json, và giải thích được vì sao tsx không bắt lỗi type.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Từ bài 00 bạn chạy mọi thứ bằng <code>npx tsx</code> — kể cả decorators ở bài 17. Nhưng bạn có để ý <code>tsx</code> không hề tạo ra file <code>.js</code> nào? Nó "biên dịch on-the-fly rồi vứt đi". Vậy khi đưa lên server production, cái gì chạy? Câu trả lời là <strong><code>tsc</code> biên dịch ra <code>dist/</code> rồi <code>node</code> chạy JavaScript thuần</strong>. Bài này làm rõ hai luồng đó — và đây chính là cách NestJS chạy production (bài 20+ sẽ dùng lại hệt).</p>
+  </div>
+
+  <h2>1. Vì sao TypeScript không chạy trực tiếp trên Node</h2>
+
+  <p>Node là runtime JavaScript — engine V8 chỉ hiểu JS, không hiểu cú pháp TS như <code>: number</code>, <code>interface</code>, <code>&lt;T&gt;</code>. Theo <a href="https://nodejs.org/en/learn/typescript/introduction" target="_blank">Node.js docs</a>, để chạy TS bạn phải <strong>biên dịch sang JS</strong> trước. Có hai cách làm việc này:</p>
+
+  <table class="data">
+    <thead><tr><th>Cách</th><th>Công cụ</th><th>Có tạo file .js?</th><th>Typecheck?</th><th>Dùng khi</th></tr></thead>
+    <tbody>
+      <tr><td>Biên dịch on-the-fly</td><td><code>tsx</code> (esbuild)</td><td>Không</td><td>❌ Không</td><td>Dev — muốn nhanh + auto-reload</td></tr>
+      <tr><td>Biên dịch thật ra file</td><td><code>tsc</code></td><td>Có → <code>dist/</code></td><td>✅ Có</td><td>Production / CI</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Điểm mấu chốt — tsx và tsc KHÁC nhau ở "typecheck"</div>
+    <p><code>tsx</code> dùng <strong>esbuild</strong> để <em>bóc type</em> cực nhanh — nhưng <strong>không kiểm tra</strong> type có đúng không. <code>tsc</code> vừa bóc type vừa <strong>kiểm tra</strong>, rồi phát ra file <code>.js</code>. Hệ quả: chạy <code>tsx</code> mà code có lỗi type thì vẫn "chạy xanh"; chỉ <code>tsc</code> mới bắt được. Đây là lý do senior luôn giữ một lệnh <code>typecheck</code> trong CI, độc lập với việc "chạy được".</p>
+  </div>
+
+  <h2>2. Minh chứng — tsx không bắt lỗi type, tsc thì bắt</h2>
+
+  <p>Thử với một dòng code sai type rõ ràng (<code>const n: number = 'không phải số'</code>):</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — cùng một file, hai kết quả khác nhau (đã verify thật)</span>
+<pre><code><span class="cmt"># 1) tsx: bóc type rồi chạy — KHÔNG phàn nàn, vẫn in ra</span>
+$ <span class="tbl">npx</span> tsx typecheck-gap.ts
+tsx vẫn chạy: không phải số          <span class="cmt"># ← exit 0, không có lỗi gì</span>
+
+<span class="cmt"># 2) tsc: kiểm tra type — BẮT lỗi ngay lập tức</span>
+$ <span class="tbl">npx</span> tsc --noEmit typecheck-gap.ts
+error TS2322: Type <span class="str">'string'</span> is not assignable to type <span class="str">'number'</span>.</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Kết luận thực dụng</div>
+    <ul class="checklist">
+      <li><code>tsx</code> = chạy nhanh cho <strong>dev</strong> (auto-reload, không chờ biên dịch).</li>
+      <li><code>tsc --noEmit</code> = <strong>typecheck</strong> — bắt lỗi type, không phát file. Đặt trong CI.</li>
+      <li><code>tsc</code> = <strong>build</strong> — typecheck + phát JS ra <code>dist/</code>. Đặt trong deploy.</li>
+    </ul>
+  </div>
+
+  <h2>3. tsconfig.json — bảng khai thác đúng mức</h2>
+
+  <p><code>tsconfig.json</code> là "bảng điều khiển" cho <code>tsc</code>. File hiện tại của dự án bạn (đã verify chạy XANH):</p>
+
+  <div class="code-block">
+    <span class="code-label">elearning-backend/tsconfig.json — toàn bộ</span>
+<pre><code>{
+  <span class="str">"compilerOptions"</span>: {
+    <span class="str">"target"</span>: <span class="str">"ES2022"</span>,           <span class="cmt">// JS phát ra theo chuẩn nào</span>
+    <span class="str">"module"</span>: <span class="str">"NodeNext"</span>,         <span class="cmt">// hệ module (ESM) theo Node hiện đại</span>
+    <span class="str">"moduleResolution"</span>: <span class="str">"NodeNext"</span>, <span class="cmt">// cách TS tìm file khi import</span>
+    <span class="str">"strict"</span>: <span class="kw">true</span>,              <span class="cmt">// chế độ nghiêm ngặt — bắt lỗi sớm</span>
+    <span class="str">"esModuleInterop"</span>: <span class="kw">true</span>,      <span class="cmt">// import CJS từ ESM mượt mà</span>
+    <span class="str">"experimentalDecorators"</span>: <span class="kw">true</span>, <span class="cmt">// bật decorators (bài 17)</span>
+    <span class="str">"skipLibCheck"</span>: <span class="kw">true</span>,          <span class="cmt">// bỏ check .d.ts của thư viện (nhanh hơn)</span>
+    <span class="str">"rootDir"</span>: <span class="str">"./src"</span>,            <span class="cmt">// gốc code — tái tạo cấu trúc trong dist/</span>
+    <span class="str">"outDir"</span>: <span class="str">"dist"</span>,               <span class="cmt">// nơi chứa JS đã biên dịch</span>
+    <span class="str">"types"</span>: [<span class="str">"node"</span>]             <span class="cmt">// chỉ nạp type của node, không nạp hết mọi @types</span>
+  },
+  <span class="str">"include"</span>: [<span class="str">"src"</span>] <span class="cmt">// chỉ biên dịch thư mục src</span>
+}</code></pre>
+  </div>
+
+  <table class="data">
+    <thead><tr><th>Cờ</th><th>Quyết định gì</th><th>Vì sao quan trọng</th></tr></thead>
+    <tbody>
+      <tr><td><code>target</code></td><td>JS phát ra theo chuẩn ES nào</td><td>ES2022 = chạy trên Node hiện đại, không cần transpile cũ</td></tr>
+      <tr><td><code>module</code> / <code>moduleResolution</code></td><td>ESM hay CJS, cách tìm file</td><td><code>NodeNext</code> khớp <code>"type":"module"</code> → import phải đủ đuôi <code>.js</code></td></tr>
+      <tr><td><code>strict</code></td><td>Bật loạt kiểm tra nghiêm ngặt</td><td>Bắt lỗi type từ sớm — chuẩn senior</td></tr>
+      <tr><td><code>rootDir</code> → <code>outDir</code></td><td>Ánh xạ <code>src/</code> → <code>dist/</code></td><td>Giữ cấu trúc thư mục khi biên dịch</td></tr>
+      <tr><td><code>types</code></td><td>Nạp type toàn cục nào</td><td><code>["node"]</code> giúp có <code>process</code>, <code>Buffer</code>… mà không kéo theo thư viện rác</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. Build &amp; chạy production — flow thật</h2>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — biên dịch rồi chạy JavaScript thuần (đã verify XANH)</span>
+<pre><code><span class="cmt"># 1) Build: typecheck + phát JS ra dist/</span>
+$ <span class="tbl">npx</span> tsc
+$ <span class="tbl">ls</span> dist/
+courses.js  db.js  server.js  ts17-decorators-demo.js
+
+<span class="cmt"># 2) Chạy JavaScript đã biên dịch — KHÔNG cần tsx</span>
+$ <span class="tbl">node</span> dist/server.js
+✅ Database connected
+✅ Express running at http://localhost:4000
+
+<span class="cmt"># 3) Kiểm tra bằng curl — hệt như lúc dev</span>
+$ <span class="tbl">curl</span> http://localhost:4000/api/courses
+[{<span class="str">"id"</span>:<span class="num">1</span>,<span class="str">"title"</span>:<span class="str">"NestJS cơ bản"</span>,...}]</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao phải biết flow này trước NestJS?</div>
+    <p>NestJS production không chạy bằng <code>tsx</code> mà bằng đúng flow này: <code>nest build</code> (bọc ngoài <code>tsc</code>) → chạy <code>node dist/main.js</code>. Hiểu <code>tsc</code>/<code>dist</code> ngay bây giờ thì sang Module 4 bạn chỉ việc "đổi tên lệnh", không bỡ ngỡ.</p>
+  </div>
+
+  <h2>5. Thêm script cho gọn — bước đầu của "production-ready"</h2>
+
+  <p>Chạy lệnh dài <code>npx tsc</code> rồi <code>node dist/server.js</code> mỗi lần là dễ quên. Chuẩn là đưa vào <code>scripts</code> của <code>package.json</code> (theo <a href="https://12factor.net/build-release-run" target="_blank">12-Factor App</a>: build là một bước tách bạch, lặp lại được):</p>
+
+  <div class="code-block">
+    <span class="code-label">package.json — thêm 3 script</span>
+<pre><code><span class="str">"scripts"</span>: {
+  <span class="str">"dev"</span>: <span class="str">"tsx watch src/server.ts"</span>,   <span class="cmt">// dev: auto-reload</span>
+  <span class="str">"start"</span>: <span class="str">"tsx src/server.ts"</span>,        <span class="cmt">// dev: chạy 1 lần</span>
+  <span class="str">"typecheck"</span>: <span class="str">"tsc --noEmit"</span>,       <span class="cmt">// CI: chỉ kiểm tra type</span>
+  <span class="str">"build"</span>: <span class="str">"tsc"</span>,                     <span class="cmt">// production: biên dịch ra dist/</span>
+  <span class="str">"start:prod"</span>: <span class="str">"node dist/server.js"</span>  <span class="cmt">// production: chạy JS thuần</span>
+}</code></pre>
+  </div>
+
+  <p>Sau khi thêm, mọi việc gọn lại thành: <code>npm run typecheck</code> (kiểm tra), <code>npm run build</code> (biên dịch), <code>npm run start:prod</code> (chạy). Cùng một lệnh, chạy được ở mọi máy.</p>
+
+  <h2>6. Nâng cao (senior) — 3 cờ bạn sẽ gặp tiếp</h2>
+
+  <table class="data">
+    <thead><tr><th>Cờ</th><th>Làm gì</th><th>Khi nào cần</th></tr></thead>
+    <tbody>
+      <tr><td><code>declaration: true</code></td><td>Phát ra file <code>.d.ts</code> (type) kèm theo</td><td>Khi xuất bản <strong>thư viện</strong> cho người khác dùng type</td></tr>
+      <tr><td><code>sourceMap: true</code></td><td>Tạo map ánh xạ JS → TS để debug</td><td>Debug code đã build trong production</td></tr>
+      <tr><td><code>noEmit: true</code></td><td>Chỉ typecheck, không phát file</td><td>Thay cho <code>tsc --noEmit</code> (CI)</td></tr>
+    </tbody>
+  </table>
+
+  <p>Bạn chưa cần bật chúng ngay — chỉ cần biết chúng tồn tại để không bỡ ngỡ khi thấy trong repo của người khác. Bài 23 (TypeORM migrations) và Module 8 (build production) sẽ quay lại.</p>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Hiểu vì sao TS không chạy trực tiếp trên Node (Node chỉ hiểu JS)</li>
+      <li>Phân biệt <code>tsx</code> (dev, không typecheck) vs <code>tsc</code> (build + typecheck)</li>
+      <li>Tự minh chứng được tsx bỏ qua lỗi type còn tsc thì bắt</li>
+      <li>Build dự án ra <code>dist/</code> và chạy bằng <code>node</code></li>
+      <li>Thêm script <code>typecheck</code>/<code>build</code>/<code>start:prod</code> chuẩn production</li>
+      <li>Biết <code>declaration</code>/<code>sourceMap</code>/<code>noEmit</code> là gì (chưa cần dùng)</li>
+    </ul>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Vì sao <code>npx tsx</code> chạy được file có lỗi type (<code>const n: number = 'x'</code>)?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — tsx không bắt lỗi type, nên không có chuyện "phát hiện ra lỗi".">B. Vì tsx tự sửa lỗi type giúp bạn</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! tsx dùng esbuild BÓC type (không kiểm tra) rồi chạy. Chỉ tsc mới kiểm tra type — nên CI luôn cần bước typecheck riêng.">A. Vì tsx bóc type (esbuild) mà không kiểm tra — chỉ tsc mới typecheck</button>
+    <button class="opt" data-correct="false" data-explain="Sai — tsx vẫn bóc type (để JS chạy được), chỉ là không kiểm tra tính đúng đắn.">C. Vì tsx không liên quan gì tới type</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Lệnh nào dùng để kiểm tra type mà KHÔNG phát ra file <code>dist/</code>?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — `npx tsc` phát ra file .js vào outDir.">B. <code>npx tsc</code></button>
+    <button class="opt" data-correct="false" data-explain="Sai — tsx không typecheck.">C. <code>npx tsx src/server.ts</code></button>
+    <button class="opt" data-correct="true" data-explain="Đúng! <code>--noEmit</code> = chỉ kiểm tra type, không ghi file. Đặt vào script <code>typecheck</code> cho CI.">A. <code>npx tsc --noEmit</code></button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #3</h3>
+    <div class="q">Câu 3. <code>rootDir: "./src"</code> + <code>outDir: "dist"</code> có tác dụng gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — chúng quyết định nơi ghi file, không phải tốc độ.">B. Làm biên dịch nhanh hơn</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! TS biên dịch từ <code>src/</code> và tái tạo cấu trúc thư mục vào <code>dist/</code> — giữ đúng cây thư mục để import tương đối vẫn đúng.">A. Ánh xạ code nguồn từ <code>src/</code> sang file JS trong <code>dist/</code>, giữ cấu trúc thư mục</button>
+    <button class="opt" data-correct="false" data-explain="Sai — chúng không tự động chạy server.">C. Tự động chạy server sau khi build</button>
+    <div class="feedback"></div>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu sang bài sau)</h2>
+  <p>Bạn đã thấy TypeScript mang lại gì: type an toàn (bài 16), decorators (bài 17), và cách build ra JS chạy trên Node (bài 18). Giờ câu hỏi lớn: <strong>tại sao NestJS chọn xây trên TypeScript + Dependency Injection</strong>, thay vì viết framework bằng JS thuần như Express? Decorator + type + DI kết hợp với nhau để giải quyết bài toán gì mà Express không giải được? Bài 19 sẽ trả lời — và đó là cánh cửa sang Module 4 (NestJS).</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 19 · Vì sao NestJS chọn TS + DI? Cầu nối sang NestJS</div>
+    <p class="nd">Đóng Module 3 — hiểu vì sao NestJS cần TypeScript, decorators và Dependency Injection, trước khi bước vào framework thật.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0017-ts-nang-cao-decorators-utility-types.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm trên máy thật: (1) <code>npx tsc</code> rồi xem <code>dist/</code>; (2) <code>node dist/server.js</code> rồi <code>curl /api/courses</code>; (3) thêm 3 script <code>typecheck</code>/<code>build</code>/<code>start:prod</code> vào package.json; (4) tạo file lỗi type, chạy <code>tsx</code> (chạy được) vs <code>tsc --noEmit</code> (báo lỗi) để tự thấy sự khác biệt. Gửi tôi output — tôi sẽ kiểm tra bạn phân biệt được dev vs build. Có gì chưa rõ — cứ hỏi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
