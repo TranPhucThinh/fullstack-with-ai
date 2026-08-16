@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 19 · Vì sao NestJS chọn TypeScript + Dependency Injection?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 3 · Bài 19</span>
+  <h1>Vì sao NestJS chọn TypeScript + Dependency Injection?</h1>
+  <p class="subtitle">Bạn đã thấy decorators (bài 17) và build TS (bài 18). Giờ ghép lại: NestJS không chọn TS vì "mốt" — mà vì TS + decorators + DI (Dependency Injection) giải quyết một bài toán mà Express để ngỏ: <strong>ai chịu trách nhiệm tạo ra các đối tượng trong hệ thống của bạn?</strong></p>
+  <p class="meta-line">⏱ ~45 phút · 🎯 Mục tiêu: giải thích được Dependency Injection và Inversion of Control bằng ngôn ngữ của mình, chỉ ra vấn đề chúng giải quyết trong chính code Express của bạn, và tự dựng một "container" DI mini chạy được.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ cái bạn đã biết</div>
+    <p>Nhìn lại <code>src/server.ts</code> của dự án (bài 15): mọi route dùng chung một biến <code>pool</code> khai báo ở đầu file. Muốn "thay" dependency cho route, bạn phải sửa import hoặc thêm tham số. Còn ở bài 17 bạn đã có decorator <code>@Register</code> để <em>đăng ký</em> một class vào <code>globalThis.__registry</code> — đó chính là một nửa của <strong>Dependency Injection container</strong>. Bài này hoàn thiện nửa còn lại.</p>
+  </div>
+
+  <h2>1. Vấn đề: ai tạo ra các đối tượng trong hệ thống?</h2>
+
+  <p>Trong code Express của bạn, những đối tượng như <code>pool</code>, <code>jwt</code>, <code>bcrypt</code> được <strong>tạo ra ở ngoài cùng</strong>: viết tại module, rồi mọi handler import và dùng trực tiếp. Khi hệ thống lớn lên (đổi database, mock khi test, bật/tắt tùy môi trường), bạn phải <strong>sửa chính code người dùng</strong> — nói đúng hơn là sửa khắp nơi.</p>
+
+  <p>Diễn đạt theo thuật ngữ: đối tượng <code>A</code> <em>phụ thuộc</em> (dependency) vào đối tượng <code>B</code>. Câu hỏi kiến trúc đơn giản mà khó trả lời là: <strong>ai chịu trách nhiệm tạo ra <code>B</code> và đưa nó cho <code>A</code>?</strong> Có 3 đáp án:</p>
+
+  <table class="data">
+    <thead><tr><th>Cách tạo dependency</th><th>Ai tạo?</th><th>Hệ quả</th></tr></thead>
+    <tbody>
+      <tr><td><code>A</code> tự <code>new B()</code> bên trong</td><td>Bản thân <code>A</code></td><td>Khớp nối chặt với B — khó đổi, khó test, muốn mock B thì phải sửa A</td></tr>
+      <tr><td>Import singleton từ một module</td><td>Hàm-level, dùng chung</td><td>Vẫn cứng: muốn đổi object thì sửa mọi nơi import (đúng code bạn đang viết)</td></tr>
+      <tr><td>Một <strong>container</strong> trung tâm "tiêm" B vào A</td><td>Container</td><td>A chỉ khai báo <em>cần</em> gì → nhận tự động; A không biết B được tạo thế nào</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Cốt lõi — tách "ai tạo" ra khỏi đối tượng</div>
+    <p>Ý tưởng chính của Dependency Injection: <strong>A không tự tạo B.</strong> Thay vào đó, một bên thứ ba (thường gọi là DI container / IoC container) nhận trước các "công thức tạo" cho từng đối tượng; khi một đối tượng báo nó <em>cần</em> dependency nào, container sẽ tạo đối tượng đó và <strong>tiêm</strong> vào. Việc kiểm soát "ai tạo gì" bị đảo ngược (inversion of control — IoC).</p>
+  </div>
+
+  <h2>2. Trên code thật — Express đang làm theo kiểu nào</h2>
+
+  <p>Bài 15 xây các handler kiểu này — mỗi handler <em>tự mượn</em> một singleton đã có sẵn từ ngoài:</p>
+
+  <div class="code-block">
+    <span class="code-label">src/server.ts — phong cách Express hiện tại</span>
+<pre><code><span class="kw">import</span> { pool } <span class="kw">from</span> <span class="str">'./db.js'</span>   <span class="cmt">// pool là một object dùng chung toàn file</span>
+
+<span class="fn">app</span>.<span class="fn">get</span>(<span class="str">'/api/me/courses'</span>, auth, <span class="kw">async</span> (req, res) =&gt; {
+  <span class="cmt">// PHỤ THUỘC pool được liệc trực tiếp — muốn đổi/mock thì sửa tại đây + mọi nơi</span>
+  <span class="kw">const</span> { rows } = <span class="kw">await</span> pool.<span class="fn">query</span>(<span class="str">`...JOIN...`</span>, [req.userId])
+  res.<span class="fn">json</span>(rows)
+})</code></pre>
+  </div>
+
+  <p>Vấn đề tinh vi: mọi handler <strong>biết quá nhiều</strong> về nơi lấy dependency (biết file <code>db.js</code>, biết biến <code>pool</code>). Muốn đưa pool giả (mock) vào để test route, handler không cho bạn — nó import trực tiếp file thật, nên test phải mở database thật hoặc đánh bạc hardcode. Đây là lý do <a href="https://docs.nestjs.com/fundamentals/custom-providers" target="_blank">NestJS xây DI ngay từ nền tảng</a>:</p>
+
+  <ol>
+    <li><strong>Test được</strong>: đối tượng nhận dependency qua <em>tham số constructor</em> → test chỉ việc tạo đối tượng kèm một mock đơn giản.</li>
+    <li><strong>Đổi được theo môi trường</strong>: cùng một "tên đăng ký", lúc dev dùng A, lúc production đổi sang B mà code không thay đổi.</li>
+    <li><strong>Quản lý tập trung</strong>: mọi object ra đời từ một nơi → dễ thêm log, kiểm soát vòng đời (lazy, singleton...).</li>
+  </ol>
+
+  <h2>3. DI hoạt động thế nào — "container" là gì</h2>
+
+  <p>Một DI container gọn chỉ có 2 việc:</p>
+
+  <ol>
+    <li><strong>Register</strong> — "khi ai đó cần tên <code>X</code>, hãy tạo theo công thức này".</li>
+    <li><strong>Resolve</strong> — khi một đối tượng báo "tôi cần <code>X</code>", container chạy công thức đã đăng ký để tạo <code>X</code> (và nếu <code>X</code> lại cần <code>Y</code>, lặp tiếp).</li>
+  </ol>
+
+  <p>Bạn đã có nửa đầu: decorator <code>@Register</code> bài 17 đã ghi class vào registry. Nửa sau chính là <strong>resolve</strong> — một nơi sinh ra đối tượng theo nhu cầu. Đây là lý do NestJS gắn bó với TS + decorators: decorator là <em>cú pháp khai báo metadata</em> gọn, và TS cung cấp <code>reflect-metadata</code> để lúc chạy container <em>biết được</em> constructor đòi kiểu nào mà không cần viết tay. (Cơ chế đó sẽ thành code thật ở bài 20–21; giờ chỉ chốt ý tưởng.) Còn vì sao trước hết NestJS thích TS hơn JS thuần — đoạn sau nói rõ.</p>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao TS làm được điều Express không làm được</div>
+    <p>Express không hề biết "kiểu" của handler — mọi thứ đều là function nhận (req, res). NestJS ngược lại: <code>@Controller</code> / <code>@Get</code> / <code>@Injectable</code> gắn metadata lên class, và container dựng cây dependency <em>tự động theo type</em>. Express để người dùng tự nối; NestJS đòi khai báo cấu trúc thì máy dựng phần còn lại. Với type đầy đủ như TS, container làm việc đó chính xác — không phải đoán.</p>
+  </div>
+
+  <h2>4. Nhào thật: dựng DI container mini trong dự án</h2>
+
+  <p>Tạo file <code>src/di-demo.ts</code> (cạnh <code>ts17-decorators-demo.ts</code>) — bạn sẽ thấy mọi khớp nối của NestJS chỉ là phiên bản to hơn của cái này. Đã verify chạy XANH với TypeScript 7.0.2 + strict mode đúng như tsconfig dự án.</p>
+
+  <div class="code-block">
+    <span class="code-label">src/di-demo.ts — DI container mini (mô phỏng lõi NestJS)</span>
+<pre><code><span class="cmt">// Demo Bài 19 — container DI mini</span>
+<span class="cmt">// Chạy: npx tsx src/di-demo.ts (phải in ra "Course 1: NestJS bán")</span>
+
+<span class="cmt">// Hợp đồng: controller chỉ biết interface, không biết ai cài nó</span>
+<span class="kw">interface</span> Database { <span class="fn">getCourseById</span>(id: number): string }
+<span class="kw">interface</span> CourseService { <span class="fn">showCourse</span>(id: number): string }
+
+<span class="kw">class</span> Container {
+  <span class="cmt">// "công thức" tạo từng dependency; resolve param là container để có thể lồng nhiều cấp</span>
+  <span class="kw">private</span> factories = <span class="kw">new</span> <span class="tbl">Map</span>&lt;string, (c: Container) =&gt; <span class="kw">unknown</span>&gt;()
+  <span class="kw">private</span> singletons = <span class="kw">new</span> <span class="tbl">Map</span>&lt;string, <span class="kw">unknown</span>&gt;()
+
+  <span class="fn">register</span>&lt;T&gt;(token: string, factory: (c: Container) =&gt; T): <span class="kw">this</span> {
+    <span class="kw">this</span>.factories.<span class="fn">set</span>(token, factory)
+    <span class="kw">return</span> <span class="kw">this</span> <span class="cmt">// trả this để nối chuỗi register().register()</span>
+  }
+
+  <span class="cmt">// resolve: trả một bản duy nhất (singleton) nếu đã tạo; nếu chưa, chạy factory rồi lưu lại</span>
+  <span class="cmt">// Người gọi KHÔNG biết object ở đâu, ai tạo — quyền tạo đã nằm trong container</span>
+  <span class="fn">resolve</span>&lt;T&gt;(token: string): T {
+    <span class="kw">if</span> (<span class="kw">this</span>.singletons.has(token)) {
+      <span class="kw">return</span> <span class="kw">this</span>.singletons.get(token) <span class="kw">as</span> T
+    }
+    <span class="kw">const</span> factory = <span class="kw">this</span>.factories.get(token)
+    <span class="kw">if</span> (!factory) <span class="kw">throw</span> <span class="kw">new</span> <span class="tbl">Error</span>(<span class="str">`Không có provider cho "${token}"`</span>)
+    <span class="kw">const</span> instance = factory(<span class="kw">this</span>)
+    <span class="kw">this</span>.singletons.set(token, instance)
+    <span class="kw">return</span> instance <span class="kw">as</span> T
+  }
+}
+
+<span class="cmt">// ===== REGISTER: đăng ký "cách tạo", chưa dựng đối tượng nào ngay =====</span>
+<span class="kw">const</span> container = <span class="kw">new</span> <span class="tbl">Container</span>()
+container
+  .<span class="fn">register</span>&lt;Database&gt;(<span class="str">'database'</span>, () =&gt; ({
+    <span class="fn">getCourseById</span>(id) { <span class="kw">return</span> `Course ${id}: NestJS bán` }
+  }))
+  .<span class="fn">register</span>&lt;CourseService&gt;(<span class="str">'courseService'</span>, (c) =&gt; {
+    <span class="cmt">// courseService KHÔNG tự new database; mà "xin" (resolve) từ container</span>
+    <span class="kw">const</span> db = c.<span class="fn">resolve</span>&lt;Database&gt;(<span class="str">'database'</span>)
+    <span class="kw">return</span> { <span class="fn">showCourse</span>(id) { <span class="kw">return</span> db.<span class="fn">getCourseById</span>(id) } }
+  })
+
+<span class="cmt">// ==== Ai dùng cũng chỉ cần 1 lời gọi: "cho tôi courseService" =====</span>
+<span class="kw">const</span> svc = container.<span class="fn">resolve</span>&lt;CourseService&gt;(<span class="str">'courseService'</span>)
+<span class="fn">console</span>.<span class="fn">log</span>(svc.<span class="fn">showCourse</span>(<span class="num">1</span>)) <span class="cmt">// Course 1: NestJS bán</span>
+<span class="cmt">// Thử lỗi: resolve tên CHƯA đăng ký thì ném lỗi ngay</span>
+<span class="cmt">// console.log(container.resolve&lt;unknown&gt;(&#39;chưa đăng ký&#39;))</span></code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">🛑 Trước khi chạy — tự kiểm bạn hiểu</div>
+    <p>Che lại khối <code>register</code> rồi tự hỏi: trong factory của <code>courseService</code>, vì sao gọi <code>resolve('database')</code> mà <em>không sợ thiếu công thức</em>? (Trả lời: vì <code>register('database', ...)</code> đã được gọi phía trên, trước khi resolve — thứ tự đăng ký trước, dùng sau.)</p>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh (feedback ngay)</h3>
+    <div class="q">Câu 1. Trong demo trên, <code>courseService</code> lấy được <code>database</code> bằng cách nào?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — đó là phong cách của server.ts hiện tại, KHÔNG phải DI: đối tượng tự new/import trực tiếp.">A. Service tự <code>new Database()</code> bên trong</button>
+    <button class="opt" data-correct="true" data-explain="Đúng! Container giữ công thức tạo mọi cấp; factory của courseService nhận container c và gọi resolve('database'). Đối tượng KHÔNG tự tạo dependency, mà được TIÊM VÀO — chính là Dependency Injection.">B. Trong factory của courseService gọi <code>c.resolve('database')</code> — container tiêm cho nó</button>
+    <button class="opt" data-correct="false" data-explain="Sai — không hề có hàm toàn cục nào; dependency đi qua container, không import trực tiếp.">C. Một hàm toàn cục <code>getDatabase()</code> khai tại module khác</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Kiểm tra nhanh #2</h3>
+    <div class="q">Câu 2. Điểm lợi nổi bật của DI container so với cách server.ts đang viết (import thẳng pool), khi phải viết test?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — DI không khiến hệ thống chạy nhanh hơn; nó thêm khâu trung gian.">A. Làm hệ thống nhanh hơn vì object đã được tạo sẵn</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — container là nơi duy nhất quyết định 'tạo theo công thức nào'. Trong test ta register('database', mock) rồi resolve, mọi nơi dùng đều nhận mock — không phải mở db.js.">B. Dễ mock: thay công thức 'database' bằng một mock từ test, mọi nơi resolve vẫn hoạt động như cũ</button>
+    <button class="opt" data-correct="false" data-explain="Sai — khái niệm không liên quan tới mã hóa data.">C. Tự động mã hóa mọi dữ liệu</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Bạn vừa đạt được</div>
+    <ul class="checklist">
+      <li>Chỉ ra được bài toán "ai tạo đối tượng" mà code Express hiện tại gánh, và vì sao nó cồng kênh khi test</li>
+      <li>Định nghĩa được DI + IoC theo lời mình: "đối tượng không tự tạo dependency, mà container giữ công thức và tiêm vào theo yêu cầu"</li>
+      <li>Nối được gì tại sao NestJS chọn TS + decorators + DI: để container đọc type tự resolve không cần viết tay</li>
+      <li>Viết và chạy được một DI container mini trong thư mục dự án</li>
+    </ul>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🔍 Góc phỏng vấn — câu hay hỏi</div>
+    <p><strong>"DI là gì, tại sao dùng?"</strong> — gọn 3 lớp: (1) Kỹ thuật: để đối tượng nhận dependency qua tham số thay vì tự tạo; (2) Lý do: test được, đổi được theo môi trường, quản lý tập trung; (3) Máy móc: container giữ công thức tạo, resolve theo tên/type; NestJS kết DI + decorators thành một nền tảng uniform cho mọi module. Nếu được hỏi thêm — nhấc "singleton scope" mặc định của NestJS.</p>
+    <p class="meta-line">Nguồn để đọc sâu: <a href="https://docs.nestjs.com/fundamentals/custom-providers" target="_blank">NestJS — Custom providers</a> · <a href="https://en.wikipedia.org/wiki/Dependency_injection" target="_blank">Wikipedia — Dependency injection</a></p>
+  </div>
+
+  <h2>5. Câu hỏi tư duy (bắc cầu sang Module 4)</h2>
+  <p>Bạn vừa tự dựng container với API gọi bằng <em>tên chuỗi</em> (<code>'database'</code>, <code>'courseService'</code>). Nhưng NestJS gọi bằng <em>class</em>, dùng constructor <code>constructor(private readonly svc: CourseService)</code> — không cần khai báo tên chuỗi nào cả. Hỏi: làm thế nào container nhìn vào <code>constructor</code> và biết cần cung cấp kiểu nào, mà không phải viết tay tên? (Gợi ý: nhớ <code>emitDecoratorMetadata</code> + <code>Reflect.metadata</code> — thứ bạn chỉ đọc lướt ở bài 18. Bài 20 sẽ trả lời.)</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo (mở Module 4 — NestJS nền tảng)</div>
+    <div class="nt">Bài 20 · NestJS là gì — DI Container, Module system</div>
+    <p class="nd">Bỏ tên chuỗi, đọc constructor tự động để resolve — đúng cách mà Nest làm thật từ nền.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0018-chay-ts-voi-node.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Giao việc: tạo <code>src/di-demo.ts</code>, chạy <code>npx tsx src/di-demo.ts</code> phải in ra <code>Course 1: NestJS bán</code> và <code>npx tsc --noEmit</code> phải sạch. Rồi tự thử thêm: đổi <code>resolve('database')</code> thành <code>resolve('wrong')</code> xem container có ném lỗi rõ ràng không. Gửi tôi output — tôi chấm thật. Có gì chưa rõ, cứ hỏi tôi.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
