@@ -15,6 +15,23 @@ function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
   }
 }
 
+function time(
+  target: any,
+  propertyKey: string,
+  descriptor: PropertyDescriptor,
+) {
+  const original = descriptor.value
+  descriptor.value = function (...args: any[]) {
+    const start = Date.now()
+    const result = original.apply(this, args)
+    const end = Date.now()
+
+    console.log(`← ${propertyKey} Chạy mất: ${end - start} ms`)
+
+    return result
+  }
+}
+
 // Class decorator @Register — đăng ký class vào registry (giống NestJS đăng ký provider)
 function Register(name: string) {
   return function (constructor: any) {
@@ -27,6 +44,7 @@ function Register(name: string) {
 @Register('CalcService')
 class CalcService {
   @log
+  @time
   add(a: number, b: number): number {
     return a + b
   }

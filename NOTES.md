@@ -32,7 +32,7 @@
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
 
-## Đang làm việc — Bài 17 (TS nâng cao — decorators, utility types)
+## Đang làm việc — Bài 18 (Chạy TS với Node — tsx, tsconfig, build dist)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
@@ -47,5 +47,7 @@
 - Điểm mạnh mới: tự fix lỗi type bằng TS module augmentation — đúng cách senior; chủ động sửa lỗi SQL trong code mẫu.
 - ✅ **Bài 15 HOÀN THÀNH** (học viên tự thêm CRUD courses/enrollments/me-courses vào src/server.ts — gom thành API e-learning hoàn chỉnh; verify typecheck exit 0 + flow curl XANH: register 201, register trùng 409, login 200, create course có token 201 / không token 401, enroll 201, me/courses 200 JOIN; LR-0017 + GLOSSARY 3 thuật ngữ bài 15 đã ghi; index.html Bài 15 → done; commit d75e584 đã push).
 - ✅ **Bài 16 HOÀN THÀNH** (học viên tự thêm `interface CreateCourseBody` + `req.body as CreateCourseBody` vào src/server.ts; verify `npx tsc --noEmit` exit 0 + `tsx demo/ts16-verify.ts` XANH: type alias/union/interface/generics đúng; LR-0018 + GLOSSARY 5 thuật ngữ bài 16 đã ghi).
-- Tiếp theo: soạn Bài 17 "TS nâng cao — decorators (nền tảng NestJS), utility types" — bài cuối Module 3 trước khi sang NestJS.
+- ✅ **Bài 17 HOÀN THÀNH** (học viên tự viết decorator `@time` đo thời gian bằng Date.now() vào src/ts17-decorators-demo.ts, chồng cùng @log; verify `npx tsc --noEmit` exit 0 + `tsx src/ts17-decorators-demo.ts` XANH: @time in ms đúng; LR-0019 + GLOSSARY 4 thuật ngữ bài 17 đã ghi; thêm experimentalDecorators vào tsconfig + cheat-sheet PostgreSQL/Auth/TS).
+- Lưu ý quan trọng: demo bài 17 đặt trong `src/` (không phải `demo/`) vì tsx tôn trọng `include` của tsconfig — file ngoài include không nhận experimentalDecorators.
+- Tiếp theo: soạn Bài 18 "Chạy TS với Node — tsx, tsconfig, build ra dist".
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).

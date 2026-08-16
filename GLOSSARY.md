@@ -108,3 +108,7 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **interface** | Mô tả hình dạng object (field + kiểu) — chuẩn cho entity/DTO trong NestJS, mở rộng được bằng `extends` | 16 |
 | **generics** | Tham số kiểu `<T>` cho hàm/class dùng chung nhiều kiểu mà vẫn giữ type an toàn (vd `first<T>(arr: T[])`) | 16 |
 | **type assertion (`as`)** | Ép kiểu tĩnh (`req.body as CreateCourseBody`) nói cho TS biết hình dạng — KHÔNG validate ở runtime | 16 |
+| **decorator** | Hàm TypeScript gắn vào class/method/property/parameter để thêm hành vi/metadata mà không sửa code gốc — chạy lúc khai báo; nền tảng của `@Controller`/`@Get` trong NestJS | 17 |
+| **decorator factory** | Hàm nhận tham số rồi TRẢ VỀ một decorator (vd `@Register('x')`) — dấu hiệu nhận biết: có dấu ngoặc `()` | 17 |
+| **experimentalDecorators** | Cờ tsconfig bật decorators legacy (chưa phải chuẩn JS chính thức) — NestJS bắt buộc dùng, kèm `emitDecoratorMetadata` | 17 |
+| **utility types** | Các type sẵn có của TS để dẫn xuất type từ một interface nguồn — `Partial`, `Pick`, `Omit`, `Readonly`, `Record` | 17 |
