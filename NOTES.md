@@ -38,7 +38,7 @@
 - Git user: `thinh.18` / `thinh.tp@devtify.com`
 - Message mẫu: `teach(backend): Bài NN - <tiêu đề>`
 
-## Đang làm việc — Bài 18 (Chạy TS với Node — tsx, tsconfig, build dist)
+## Đang làm việc — Bài 20 (NestJS là gì — DI Container, Module system)
 
 - ✅ **Bài 08 HOÀN THÀNH** (verify 6 demo + env PORT chạy xanh; LR-0010 + GLOSSARY đã ghi; đã commit+push).
 - ✅ **Bài 09 HOÀN THÀNH** (học viên đã đọc xong; LR-0011 + GLOSSARY thuật ngữ bài 09 đã ghi).
@@ -56,4 +56,5 @@
 - ✅ **Bài 17 HOÀN THÀNH** (học viên tự viết decorator `@time` đo thời gian bằng Date.now() vào src/ts17-decorators-demo.ts, chồng cùng @log; verify `npx tsc --noEmit` exit 0 + `tsx src/ts17-decorators-demo.ts` XANH: @time in ms đúng; LR-0019 + GLOSSARY 4 thuật ngữ bài 17 đã ghi; thêm experimentalDecorators vào tsconfig + cheat-sheet PostgreSQL/Auth/TS).
 - Lưu ý quan trọng: demo bài 17 đặt trong `src/` (không phải `demo/`) vì tsx tôn trọng `include` của tsconfig — file ngoài include không nhận experimentalDecorators.
 - ✅ **Bài 18 ĐÃ SOẠN** (lessons/0018-chay-ts-voi-node.html; commit 52ab5a0 — kèm index.html + nav bài 17, làm trước khi có quy ước tối ưu phiên). CHỜ học viên làm: build dist, node dist/server.js, thêm 3 script typecheck/build/start:prod, thử tsx vs tsc --noEmit.
+- ✅ **Bài 19 HOÀN THÀNH** (học viên tự viết `src/di-demo.ts`: container có register/resolve, singleton cache, lỗi thiếu provider và dependency lồng `courseService → database`; phiên này chỉ review diff theo quy ước, không chạy verify; LR-0020 + GLOSSARY đã ghi).
 - Lưu ý: `.gitignore` đã bổ sung `elearning-backend/demo/SW.js` + `copy.txt` (file phát sinh demo 08).

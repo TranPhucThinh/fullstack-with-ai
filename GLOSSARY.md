@@ -112,3 +112,7 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **decorator factory** | Hàm nhận tham số rồi TRẢ VỀ một decorator (vd `@Register('x')`) — dấu hiệu nhận biết: có dấu ngoặc `()` | 17 |
 | **experimentalDecorators** | Cờ tsconfig bật decorators legacy (chưa phải chuẩn JS chính thức) — NestJS bắt buộc dùng, kèm `emitDecoratorMetadata` | 17 |
 | **utility types** | Các type sẵn có của TS để dẫn xuất type từ một interface nguồn — `Partial`, `Pick`, `Omit`, `Readonly`, `Record` | 17 |
+| **Dependency Injection (DI)** | Kỹ thuật để object nhận dependency từ bên ngoài thay vì tự `new` hoặc import trực tiếp; nhờ đó dễ thay thế và test hơn | 19 |
+| **Inversion of Control (IoC)** | Sự đảo quyền kiểm soát việc tạo và nối object: code nghiệp vụ chỉ khai báo nhu cầu, container quyết định cách cung cấp dependency | 19 |
+| **DI container** | Thành phần giữ công thức tạo dependency, resolve các dependency lồng nhau và quản lý vòng đời instance | 19 |
+| **injection token** | Khóa dùng để đăng ký và tìm provider trong container; demo bài 19 dùng chuỗi như `'database'`, NestJS còn có thể dùng class hoặc symbol | 19 |
