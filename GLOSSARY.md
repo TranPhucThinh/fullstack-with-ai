@@ -116,3 +116,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **Inversion of Control (IoC)** | Sự đảo quyền kiểm soát việc tạo và nối object: code nghiệp vụ chỉ khai báo nhu cầu, container quyết định cách cung cấp dependency | 19 |
 | **DI container** | Thành phần giữ công thức tạo dependency, resolve các dependency lồng nhau và quản lý vòng đời instance | 19 |
 | **injection token** | Khóa dùng để đăng ký và tìm provider trong container; demo bài 19 dùng chuỗi như `'database'`, NestJS còn có thể dùng class hoặc symbol | 19 |
+| **NestFactory.create()** | Điểm khởi động ứng dụng: nhận root module, container đọc metadata `@Module()` để dựng application graph rồi đưa lên HTTP adapter — tương ứng bước `resolve()` từ token gốc trong container mini | 20 |
+| **root module (AppModule)** | Module gốc khai báo thành phần đầu tiên của application graph — điểm Nest bắt đầu dựng đồ thị; là composition root, không chứa logic nghiệp vụ | 20 |
+| **@Module()** | Decorator khai báo metadata của module: `controllers`, `providers`, `imports`, `exports` — module không đăng ký controller thì container không kích hoạt class đó | 20 |
+| **@Controller()** | Decorator đánh dấu class là controller (nơi nhận request) — kèm prefix tùy chọn; chỉ có decorator là chưa đủ, class phải nằm trong `controllers` của một module | 20 |
+| **@Get()** | Method decorator ánh xạ HTTP GET tới method controller; kết hợp với prefix controller tạo thành route | 20 |
+| **application graph** | Đồ thị dependency được Nest dựng từ metadata các module — mô tả controller nào thuộc module nào, provider nào cung cấp cho ai | 20 |

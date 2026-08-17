@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 20 · NestJS app đầu tiên — bootstrap và root module</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 4 · Bài 20</span>
+  <h1>NestJS app đầu tiên: container bắt đầu từ đâu?</h1>
+  <p class="subtitle">Bạn đã tự viết DI container ở bài 19. Bây giờ chuyển sang framework thật: dựng một NestJS app tối thiểu và lần theo đúng đường đi <strong><code>main.ts → AppModule → AppController</code></strong>.</p>
+  <p class="meta-line">⏱ ~35 phút · 🎯 Một mục tiêu: giải thích được Nest bootstrap một dependency graph từ root module như thế nào.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ container mini của bạn</div>
+    <p>Bài 19, bạn gọi <code>container.register('courseService', factory)</code> rồi <code>resolve()</code>. NestJS cũng cần một nơi đăng ký và một điểm bắt đầu resolve. Khác biệt là Nest dùng <strong>class + decorator metadata</strong>: <code>@Module()</code> khai báo graph, còn <code>NestFactory.create(AppModule)</code> yêu cầu container dựng graph ấy.</p>
+  </div>
+
+  <h2>1. NestJS không chỉ là “Express có decorator”</h2>
+
+  <p>Express bắt đầu từ một object <code>app</code>, rồi bạn tự nối middleware và route. Nest bắt đầu từ một <strong>root module</strong>. Framework đọc metadata của module, tạo application context, khởi tạo controller/provider đã đăng ký, sau đó gắn route lên HTTP adapter.</p>
+
+  <table class="data">
+    <thead><tr><th>Express bạn đã viết</th><th>NestJS bài này</th><th>Trách nhiệm</th></tr></thead>
+    <tbody>
+      <tr><td><code>express()</code></td><td><code>NestFactory.create(AppModule)</code></td><td>Tạo HTTP application</td></tr>
+      <tr><td><code>app.get('/', handler)</code></td><td><code>@Controller()</code> + <code>@Get()</code></td><td>Khai báo route bằng metadata</td></tr>
+      <tr><td>Tự import/nối mọi thứ</td><td><code>@Module({ controllers: [...] })</code></td><td>Đăng ký node vào dependency graph</td></tr>
+      <tr><td><code>app.listen(4000)</code></td><td><code>app.listen(3000)</code></td><td>Mở cổng nhận request</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout why">
+    <div class="ct">💡 Root module là “composition root”</div>
+    <p><code>AppModule</code> không chứa nghiệp vụ. Nó mô tả ứng dụng được ghép từ những thành phần nào. Theo <a href="https://docs.nestjs.com/modules" target="_blank">NestJS Modules</a>, mọi ứng dụng có ít nhất một root module; Nest dùng nó làm điểm bắt đầu dựng application graph. Đây là nơi <em>nối hệ thống</em>, không phải nơi xử lý request.</p>
+  </div>
+
+  <h2>2. Đọc luồng bootstrap trước khi viết</h2>
+
+  <ol>
+    <li>Node chạy <code>src/nest/main.ts</code>.</li>
+    <li><code>NestFactory.create(AppModule)</code> tạo application context và đưa <code>AppModule</code cho container.</li>
+    <li>Container đọc <code>@Module({ controllers: [AppController] })</code>, tạo một instance <code>AppController</code>.</li>
+    <li><code>@Controller()</code> + <code>@Get()</code> tạo route <code>GET /</code>.</li>
+    <li><code>listen(3000)</code> mở HTTP server; request đi tới method controller và kết quả object được trả thành JSON.</li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="ct">📦 Package đã có sẵn</div>
+    <p>Dự án đã cài <code>@nestjs/common@11.2.1</code>, <code>@nestjs/core@11.2.1</code>, <code>@nestjs/platform-express@11.2.1</code>, <code>reflect-metadata@0.2.2</code> và <code>rxjs@7.8.2</code>. Nếu clone repo ở máy sạch, chỉ cần chạy <code>npm install</code> theo lockfile.</p>
+  </div>
+
+  <h2>3. Thử thách: tự dựng Nest app đầu tiên</h2>
+
+  <p>Giữ nguyên <code>src/server.ts</code> Express để đối chiếu. Nest nằm riêng trong <code>src/nest/</code>; tới bài migration tổng hợp ta mới chuyển nghiệp vụ.</p>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — tạo thư mục mới</span>
+<pre><code><span class="cmt"># Tạo vùng Nest riêng, không đụng server Express hiện tại</span>
+<span class="tbl">mkdir</span> -p src/nest</code></pre>
+  </div>
+
+  <div class="try-it">
+    <h3>Đề bài</h3>
+    <p>Tự tạo ba file <code>main.ts</code>, <code>app.module.ts</code>, <code>app.controller.ts</code> để <code>GET /</code> trả:</p>
+    <div class="code-block">
+      <span class="code-label">Kết quả bắt buộc</span>
+<pre><code><span class="cmt">// JSON do controller trả về</span>
+{ <span class="str">"message"</span>: <span class="str">"E-Learning NestJS đã chạy"</span> }</code></pre>
+    </div>
+
+    <p><strong>Tiêu chí:</strong></p>
+    <ul class="checklist">
+      <li><strong>TC1:</strong> <code>main.ts</code> import <code>reflect-metadata</code>, tạo app từ <code>AppModule</code> và nghe cổng 3000.</li>
+      <li><strong>TC2:</strong> <code>AppModule</code> đăng ký <code>AppController</code> trong đúng field <code>controllers</code>.</li>
+      <li><strong>TC3:</strong> <code>AppController</code> dùng <code>@Controller()</code> + <code>@Get()</code>, trả đúng object yêu cầu.</li>
+      <li><strong>TC4:</strong> Có script <code>dev:nest</code> chạy <code>tsx watch src/nest/main.ts</code>.</li>
+      <li><strong>TC5:</strong> Không sửa/xóa server Express hiện tại.</li>
+    </ul>
+
+    <p><strong>Definition of Done:</strong> một terminal chạy Nest; terminal khác gọi <code>curl</code> nhận đúng JSON; bạn tự giải thích được ba bước <code>main → module → controller</code>.</p>
+  </div>
+
+  <h3>Hint ladder — chỉ mở khi thật sự kẹt</h3>
+
+  <details>
+    <summary>Hint 1 · Ba decorator/API cần tìm</summary>
+    <p><code>NestFactory</code> đến từ <code>@nestjs/core</code>. <code>Module</code>, <code>Controller</code>, <code>Get</code> đến từ <code>@nestjs/common</code>. Xem nguồn chính chủ: <a href="https://docs.nestjs.com/first-steps" target="_blank">First steps</a> và <a href="https://docs.nestjs.com/controllers" target="_blank">Controllers</a>.</p>
+  </details>
+
+  <details>
+    <summary>Hint 2 · Khung dependency graph</summary>
+    <div class="code-block">
+      <span class="code-label">src/nest/app.module.ts — khung chưa hoàn chỉnh</span>
+<pre><code><span class="kw">import</span> { Module } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="cmt">// TODO: import AppController từ file local</span>
+
+@<span class="fn">Module</span>({
+  controllers: [<span class="cmt">/* TODO: class controller */</span>],
+})
+<span class="kw">export class</span> AppModule {}</code></pre>
+    </div>
+  </details>
+
+  <details>
+    <summary>Hint 3 · Lời giải tham khảo đầy đủ</summary>
+    <p>Chỉ đối chiếu sau khi đã tự thử. Import local giữ đuôi <code>.js</code> vì project đang dùng ESM + <code>NodeNext</code>.</p>
+
+    <div class="code-block">
+      <span class="code-label">src/nest/app.controller.ts</span>
+<pre><code><span class="kw">import</span> { Controller, Get } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+
+<span class="cmt">// Prefix rỗng: controller nhận request tại đường dẫn gốc /</span>
+@<span class="fn">Controller</span>()
+<span class="kw">export class</span> AppController {
+  <span class="cmt">// GET / được ánh xạ vào method này bằng metadata</span>
+  @<span class="fn">Get</span>()
+  <span class="fn">getRoot</span>(): { message: string } {
+    <span class="kw">return</span> { message: <span class="str">'E-Learning NestJS đã chạy'</span> }
+  }
+}</code></pre>
+    </div>
+
+    <div class="code-block">
+      <span class="code-label">src/nest/app.module.ts</span>
+<pre><code><span class="kw">import</span> { Module } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { AppController } <span class="kw">from</span> <span class="str">'./app.controller.js'</span>
+
+<span class="cmt">// Root module: khai báo node đầu tiên trong application graph</span>
+@<span class="fn">Module</span>({
+  controllers: [AppController],
+})
+<span class="kw">export class</span> AppModule {}</code></pre>
+    </div>
+
+    <div class="code-block">
+      <span class="code-label">src/nest/main.ts</span>
+<pre><code><span class="kw">import</span> <span class="str">'reflect-metadata'</span>
+<span class="kw">import</span> { NestFactory } <span class="kw">from</span> <span class="str">'@nestjs/core'</span>
+<span class="kw">import</span> { AppModule } <span class="kw">from</span> <span class="str">'./app.module.js'</span>
+
+<span class="cmt">// Composition root: container bắt đầu dựng graph từ AppModule</span>
+<span class="kw">async function</span> <span class="fn">bootstrap</span>() {
+  <span class="kw">const</span> app = <span class="kw">await</span> NestFactory.<span class="fn">create</span>(AppModule)
+  <span class="kw">await</span> app.<span class="fn">listen</span>(<span class="num">3000</span>)
+  console.<span class="fn">log</span>(<span class="str">'NestJS: http://localhost:3000'</span>)
+}
+
+<span class="cmt">// Bootstrap lỗi phải làm process thất bại thay vì im lặng</span>
+<span class="fn">bootstrap</span>().<span class="fn">catch</span>((error: unknown) =&gt; {
+  console.<span class="fn">error</span>(error)
+  process.exitCode = <span class="num">1</span>
+})</code></pre>
+    </div>
+
+    <div class="code-block">
+      <span class="code-label">Terminal — thêm script và chạy</span>
+<pre><code><span class="cmt"># Ghi script hợp lệ vào package.json mà không sửa JSON bằng tay</span>
+<span class="tbl">npm</span> pkg set scripts.dev:nest=<span class="str">"tsx watch src/nest/main.ts"</span>
+
+<span class="cmt"># Terminal 1: khởi động NestJS</span>
+<span class="tbl">npm</span> run dev:nest
+
+<span class="cmt"># Terminal 2: bằng chứng request thật đi qua controller</span>
+<span class="tbl">curl</span> http://localhost:3000/</code></pre>
+    </div>
+  </details>
+
+  <h2>4. Checkpoint: bạn có hiểu graph hay chỉ copy?</h2>
+
+  <div class="quiz">
+    <h3>🧠 Câu 1</h3>
+    <div class="q">Nếu xóa <code>AppController</code> khỏi mảng <code>controllers</code>, chuyện gì xảy ra với <code>GET /</code>?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — decorator chỉ gắn metadata lên class; class chưa được module đăng ký thì container không đưa nó vào application graph.">A. Route vẫn chạy vì có <code>@Controller()</code></button>
+    <button class="opt" data-correct="true" data-explain="Đúng — AppModule là composition root. Không đăng ký controller thì Nest không tạo instance và không gắn route của nó.">B. Route biến mất vì controller không thuộc graph của module</button>
+    <button class="opt" data-correct="false" data-explain="Sai — PostgreSQL chưa tham gia bài này.">C. Nest tự lấy controller từ database</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Câu 2</h3>
+    <div class="q"><code>NestFactory.create(AppModule)</code> gần nhất với thao tác nào trong container mini bài 19?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng — create nhận root token/module, rồi container lần theo metadata để dựng application graph.">A. Bắt đầu <code>resolve()</code> từ một token gốc</button>
+    <button class="opt" data-correct="false" data-explain="Sai — đọc HTTP body là việc của adapter/framework sau khi app đã bootstrap.">B. Parse JSON body</button>
+    <button class="opt" data-correct="false" data-explain="Sai — nó không tạo bảng database.">C. Chạy migration</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🎤 Góc phỏng vấn</div>
+    <p><strong>“NestJS module dùng để làm gì?”</strong> — trả lời gọn: module là ranh giới tổ chức và composition unit; metadata của nó khai báo controller/provider/import/export, còn root module là điểm Nest bắt đầu dựng dependency graph. Module không nên chứa logic nghiệp vụ.</p>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">✅ Khi làm xong, gửi gì để review?</div>
+    <ul class="checklist">
+      <li>Ba file trong <code>src/nest/</code> và phần scripts của <code>package.json</code>.</li>
+      <li>Output thật của <code>curl http://localhost:3000/</code>.</li>
+      <li>Một câu tự giải thích: tại sao chỉ có decorator là chưa đủ, controller vẫn phải nằm trong module?</li>
+    </ul>
+    <p>Mình sẽ review 5 trục: đúng graph · đúng boundary · type safety · khả năng chẩn đoán lỗi · mức hiểu bản chất.</p>
+  </div>
+
+  <h2>5. Câu hỏi tư duy</h2>
+  <p>Hôm nay <code>AppController</code> chưa cần dependency. Nếu ngày mai controller cần <code>CoursesService</code>, ta sẽ đăng ký service ở đâu, và Nest làm cách nào biết phải đưa instance nào vào constructor mà không gọi <code>new CoursesService()</code>?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Controller · Service · Provider — DI thật trong NestJS</div>
+    <p class="nd">Thêm service đầu tiên và quan sát container tự resolve dependency qua constructor.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0019-vi-sao-nestjs-chon-ts-va-di.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm thử thách trước, chỉ mở hint theo từng nấc. Khi gửi code + output thật, mình sẽ review thẳng theo tiêu chí ở trên. Có điểm nào chưa hiểu về <code>main → module → controller</code>, cứ hỏi ngay.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
