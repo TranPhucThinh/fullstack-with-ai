@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "dev:nest": "tsx watch src/nest/main.ts"
+    "dev:nest": "tsc && node --watch dist/nest/main.js"
   },
   "keywords": [],
   "author": "",

@@ -5,7 +5,8 @@
     "moduleResolution": "NodeNext", // cách TS tìm file khi import
     "strict": true, // bật chế độ nghiêm ngặt — bắt lỗi sớm, chuẩn senior
     "esModuleInterop": true, // import CJS từ ESM mượt mà
-    "experimentalDecorators": true, // bật decorators (kiểu NestJS) — nền cho @Controller/@Get ở Module 4
+    "experimentalDecorators": true, // bật decorators (kiểu NestJS) — nền cho @Controller/@Module
+    "emitDecoratorMetadata": true, // BẮT BUỘC cho NestJS DI — emit design:paramtypes để container biết inject gì
     "skipLibCheck": true, // bỏ kiểm tra file .d.ts của thư viện (nhanh hơn)
     "rootDir": "./src", // gốc code nguồn — giữ cấu trúc thư mục trong dist/ cho ra đúng chỗ
     "outDir": "dist", // nơi chứa code biên dịch (dùng sau này ở production)

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 21 · Controller · Service · Provider — DI thật trong NestJS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 4 · Bài 21</span>
+  <h1>Controller · Service · Provider — Container tự resolve dependency thế nào</h1>
+  <p class="subtitle">Bài 20 controller không cần dependency. Giờ thêm <code>CoursesService</code> và quan sát Nest container tự đưa instance đúng vào constructor — không gọi <code>new</code>, không import trực tiếp.</p>
+  <p class="meta-line">⏱ ~40 phút · 🎯 Mục tiêu: giải thích được "vì sao chỉ viết constructor là đủ" và vì sao project phải bật <code>emitDecoratorMetadata</code>.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ container mini bài 19</div>
+    <p>Bài 19 bạn gọi <code>container.resolve('courseService')</code> — container tự biết factory nào để tạo. Nest làm điều tương tự nhưng dùng <strong>metadata emit từ TypeScript</strong>: <code>@Injectable()</code> đánh dấu class là provider, còn <code>design:paramtypes</code> do compiler sinh ra cho Nest biết <em>constructor nhận kiểu gì</em>. Nếu metadata missing, Nest không biết phải inject cái gì.</p>
+  </div>
+
+  <h2>1. Ba vai trò bạn sẽ thấy</h2>
+
+  <table class="data">
+    <thead><tr><th>Vai trò</th><th>Ví dụ</th><th>Trách nhiệm</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Controller</strong></td><td><code>AppController</code></td><td>Nhận HTTP request, gọi service, trả JSON — KHÔNG chứa logic nghiệp vụ.</td></tr>
+      <tr><td><strong>Provider (Service)</strong></td><td><code>CoursesService</code></td><td>Chứa logic nghiệp vụ, đọc/ghi dữ liệu — được container quản lý vòng đời.</td></tr>
+      <tr><td><strong>Provider token</strong></td><td>class <code>CoursesService</code></td><td>Dùng làm <em>injection token</em> — Nest đối chiếu metadata của constructor với provider đã khai.</td></tr>
+    </tbody>
+  </table>
+
+  <p>Theo <a href="https://docs.nestjs.com/providers" target="_blank">tài liệu Providers của NestJS</a>, provider là ý tưởng cốt lõi để inject dependency; một class được đánh dấu <code>@Injectable()</code> và đăng ký trong <code>@Module({ providers: [...] })</code> sẽ nằm trong vòng đời quản lý của container. Controller cũng có thể là provider nếu nó được inject.</p>
+
+  <h2>2. Hai mảnh ghép để DI hoạt động</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/courses.service.ts — provider mới, @Injectable()</span>
+<pre><code><span class="kw">import</span> { Injectable } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+
+<span class="cmt">// Dữ liệu tạm — bài 23 sẽ thay bằng TypeORM + PostgreSQL</span>
+<span class="kw">export interface</span> Course {
+  id: number
+  title: string
+  price: number
+}
+
+<span class="kw">const</span> courses: Course[] = [
+  { id: <span class="num">1</span>, title: <span class="str">'NestJS cơ bản'</span>, price: <span class="num">500000</span> },
+  { id: <span class="num">2</span>, title: <span class="str">'Design Pattern cho Backend'</span>, price: <span class="num">800000</span> },
+]
+
+<span class="cmt">// @Injectable() đánh dấu class là provider mà container có thể quản lý</span>
+@<span class="fn">Injectable</span>()
+<span class="kw">export class</span> CoursesService {
+  <span class="fn">findAll</span>(): Course[] {
+    <span class="kw">return</span> courses
+  }
+}</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/app.module.ts — đăng ký provider vào module</span>
+<pre><code><span class="kw">import</span> { Module } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { AppController } <span class="kw">from</span> <span class="str">'./app.controller.js'</span>
+<span class="kw">import</span> { CoursesService } <span class="kw">from</span> <span class="str">'./courses.service.js'</span>
+
+@<span class="fn">Module</span>({
+  controllers: [AppController],
+  providers: [CoursesService], <span class="cmt">// provider token = class CoursesService</span>
+})
+<span class="kw">export class</span> AppModule {}</code></pre>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/app.controller.ts — controller xin dependency qua constructor</span>
+<pre><code><span class="kw">import</span> { Controller, Get } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { CoursesService } <span class="kw">from</span> <span class="str">'./courses.service.js'</span>
+
+@<span class="fn">Controller</span>()
+<span class="kw">export class</span> AppController {
+  <span class="cmt">// KHÔNG gọi new CoursesService() — Nest tự inject instance đúng</span>
+  <span class="kw">constructor</span>(<span class="kw">private readonly</span> coursesService: CoursesService) {}
+
+  @<span class="fn">Get</span>()
+  <span class="fn">getRoot</span>(): { message: string } {
+    <span class="kw">return</span> { message: <span class="str">'E-Learning NestJS đã chạy'</span> }
+  }
+
+  @<span class="fn">Get</span>(<span class="str">'courses'</span>)
+  <span class="fn">getCourses</span>() {
+    <span class="kw">return</span> <span class="kw">this</span>.coursesService.findAll()
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🎯 VÌ SAO phải bật <code>emitDecoratorMetadata</code>?</div>
+    <p>TypeScript khi có <code>experimentalDecorators</code> + <code>emitDecoratorMetadata: true</code> sẽ phát ra <code>design:paramtypes</code> — một mảng các class constructor đang nhận. Nest đọc metadata này để biết <code>AppController</code> cần <code>CoursesService</code> và tìm provider có cùng token. Nếu thiếu flag, metadata bị <em>thiếu</em> → <code>this.coursesService</code> là <code>undefined</code> → request 500.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ tsx (esbuild) KHÔNG emit metadata — mấu chốt</div>
+    <p><code>tsx</code> dùng esbuild để transform code nhanh, <strong>không ra <code>design:paramtypes</code></strong>. Chạy Nest bằng <code>tsx watch src/nest/main.ts</code> → DI không hoạt động, mọi DI về <code>undefined</code>. Đã verify: build bằng <code>tsc</code> rồi chạy <code>node</code> thì DI XANH. Do đó bài này đổi script <code>dev:nest</code>:</p>
+  </div>
+
+  <div class="code-block">
+    <span class="code-label">Terminal — đổi script cho đúng cách (tsc build rồi mới node chạy)</span>
+<pre><code><span class="cmt"># Khi bạn mở bài này, package.json đã được AI cập nhật script như dưới — kiểm tra lại nhé</span>
+<span class="tbl">npm</span> pkg set scripts.dev:nest=<span class="str">"tsc && node --watch dist/nest/main.js"</span>
+
+<span class="cmt"># Nếu server cũ đang chạy từ bài 20, hãy Ctrl+C dừng rồi chạy lại bằng cách mới</span>
+<span class="tbl">npm</span> run dev:nest</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">💡 Vì sao container biết gọi provider nào?</div>
+    <p>Khi bạn viết <code>private readonly coursesService: CoursesService</code>, TypeScript phát metadata chứa kiểu <code>CoursesService</code>. Nest dùng chính kiểu đó làm <strong>injection token</strong> — giống token <code>'courseService'</code> ở bài 19 nhưng an toàn hơn (kiểu class, không trả chuỗi gõ tay). Đó là lý do NestJS chọn DI kiểu class token.</p>
+  </div>
+
+  <h2>3. Thử thách triển khai</h2>
+
+  <div class="try-it">
+    <h3>Đề bài</h3>
+    <p>Từ code Nest của bài 20, thêm <code>CoursesService</code> và route <code>GET /courses</code>, đồng thời đổi script chạy sang cách tsc+node.</p>
+
+    <ul class="checklist">
+      <li><strong>TC1:</strong> Tạo <code>src/nest/courses.service.ts</code> có <code>@Injectable()</code>, field <code>findAll()</code> trả mảng khóa học.</li>
+      <li><strong>TC2:</strong> <code>AppModule</code> đăng ký <code>CoursesService</code> trong <code>providers</code>.</li>
+      <li><strong>TC3:</strong> <code>AppController</code> khai constructor nhận <code>CoursesService</code> và thêm route <code>GET /courses</code> gọi <code>findAll()</code>.</li>
+      <li><strong>TC4:</strong> Script <code>dev:nest</code> chạy bằng <code>tsc && node --watch dist/nest/main.js</code> (không dùng tsx cho Nest).</li>
+      <li><strong>TC5:</strong> Nhận được <code>curl http://localhost:3000/courses</code> trả JSON mảng khóa học — không lỗi 500.</li>
+    </ul>
+
+    <p><strong>Definition of Done:</strong> một terminal chạy Nest; terminal khác gọi <code>curl</code> nhận đúng mảng khóa học; bạn tự giải thích vì sao thiếu <code>emitDecoratorMetadata</code> thì kết quả vẫn lỗi.</p>
+  </div>
+
+  <h3>Hint ladder — chỉ mở khi kẹt thật</h3>
+
+  <details>
+    <summary>Hint 1 · Ba file cần sửa</summary>
+    <p><code>courses.service.ts</code> (tạo mới), <code>app.module.ts</code> (thêm provider), <code>app.controller.ts</code> (inject + route). Thứ tự quan trọng: provider đăng ký TRƯỚC controller dùng nó.</p>
+  </details>
+
+  <details>
+    <summary>Hint 2 — Nghi ngờ metadata</summary>
+    <p>Kiểm tra file build ra <code>dist/</code> có chứa <code>design:paramtypes</code> không. Nếu chạy bằng tsx thì không sẽ ra. Cách build bằng tsc và chạy bằng node từ <code>dist/nest/main.js</code>.</p>
+  </details>
+
+  <h2>4. Checkpoint — bạn hiểu DI hay chỉ copy?</h2>
+
+  <div class="quiz">
+    <h3>🧠 Câu 1</h3>
+    <div class="q">Nếu quên đăng ký <code>CoursesService</code> trong <code>providers</code>, điều gì xảy ra khi gọi <code>GET /courses</code>?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — vẫn lỗi vì container không thể tìm provider theo token.">A. Route vẫn chạy vì Nest tự tìm service bằng constructor</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — Nest không thấy token CoursesService trong graph, ném CANNOT_RESOLVE_DEPENDENCY (500).">B. Nest báo lỗi không resolve được dependency</button>
+    <button class="opt" data-correct="false" data-explain="Sai — controller không cắm DB ở đây.">C. Nest gọi trực tiếp database cho xem</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Câu 2</h3>
+    <div class="q">Tại sao ta phải build bằng tsc chứ không chạy trực tiếp bằng tsx?</div>
+    <button class="opt" data-correct="true" data-explain="Đúng — tsx dùng esbuild, không bổ sung design:paramtypes, DI không hoạt động.">A. tsx (esbuild) không emit design:paramtypes nên DI sẽ lỗi</button>
+    <button class="opt" data-correct="false" data-explain="Ngược lại — esbuild không bổ sung design:paramtypes ngoài các decorator trần, compatibility còn tồi hơn.">B. esbuild emit metadata tốt hơn tsc, ai cũng dùng tsx được</button>
+    <button class="opt" data-correct="false" data-explain="Sai — tsx khi chạy TS cũng không tạo thêm design:paramtypes; việc chọn tsx hay node không phụ thuộc vào hot-reload.">C. Vì tsx không có hot-reload, còn node --watch mới có</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🎤 Góc phỏng vấn – nếu hỏi “@Injectable() để làm gì?”</div>
+    <p>Trả lời gọn: <code>@Injectable()</code> đánh dấu class là provider; đăng ký trong <code>@Module().providers</code> thì class thuộc vòng đời container; Nest tự nối constructor của controller bằng metadata <code>design:paramtypes</code>. Nhờ container quản lý, ta không tự tay gọi <code>new</code> nhiều chỗ — dễ test và dễ thay thế provider.</p>
+  </div>
+
+  <h2>5. Câu hỏi tư duy (bắc cầu bài sau)</h2>
+  <p>Service của bạn vừa đọc dữ liệu từ mảng hằng. Nếu <code>GET /courses</code> cần lọc theo query (vd <code>?minPrice=600000</code>), bạn sẽ đưa tham số vào đâu — method controller hay method service? Và validation biến từ URL thành number nên để ở tầng nào?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 22 · DTO · ValidationPipe · class-validator</div>
+    <p class="nd">Xác thực dữ liệu request ở đúng nơi — dùng DTO và pipe chuẩn Nest thay vì tự if/else trong controller.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0020-nestjs-app-dau-tien.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm xong cho tôi thấy code 3 file + output <code>curl</code> thật. Có chỗ nào chưa hiểu về DI của Nest so với container mini bài 19, cứ hỏi ngay.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
