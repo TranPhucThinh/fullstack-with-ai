@@ -122,3 +122,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **@Controller()** | Decorator đánh dấu class là controller (nơi nhận request) — kèm prefix tùy chọn; chỉ có decorator là chưa đủ, class phải nằm trong `controllers` của một module | 20 |
 | **@Get()** | Method decorator ánh xạ HTTP GET tới method controller; kết hợp với prefix controller tạo thành route | 20 |
 | **application graph** | Đồ thị dependency được Nest dựng từ metadata các module — mô tả controller nào thuộc module nào, provider nào cung cấp cho ai | 20 |
+| **@Injectable()** | Decorator đánh dấu class thành provider mà container có thể quản lý vòng đời; phải đăng ký trong `@Module().providers` mới nằm trong application graph | 21 |
+| **provider** | Khái niệm cốt lõi của DI trong NestJS — bất kỳ class/service được đánh dấu `@Injectable()` và đăng ký để container cung cấp khi cần | 21 |
+| **injection token (class)** | Dùng chính class làm khóa để đăng ký và tìm provider — an toàn hơn token chuỗi gõ tay ở bài 19; Nest đối chiếu metadata constructor với token này | 21 |
+| **emitDecoratorMetadata** | Flag tsconfig bắt TypeScript phát ra `design:paramtypes` (kiểu các constructor param) — Nest đọc để biết cần inject gì; thiếu flag → service `undefined` → 500 | 21 |
+| **design:paramtypes** | Metadata do tsc sinh ra khi bật `emitDecoratorMetadata`: mảng các kiểu mà constructor nhận — chính là thứ Nest đọc để inject dependency | 21 |
+| **constructor injection** | Kiểu DI bằng cách khai dependency trong `constructor(private readonly x: Type)` — Nest tự đưa instance đúng vào, không gọi `new` | 21 |

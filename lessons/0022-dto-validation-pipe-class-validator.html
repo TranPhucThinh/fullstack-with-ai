@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 22 · DTO · ValidationPipe · class-validator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 4 · Bài 22</span>
+  <h1>DTO · ValidationPipe · class-validator — xác thực dữ liệu ở đúng tầng</h1>
+  <p class="subtitle">Bài 21 controller nhận body nhưng chưa kiểm tra. Giờ thêm <code>CreateCourseDto</code> + <code>ValidationPipe</code> để Nest tự validate body trước khi tới controller — không còn if/else thủ công.</p>
+  <p class="meta-line">⏱ ~40 phút · 🎯 Mục tiêu: giải thích được vì sao DTO + pipe là cách chuẩn, và vì sao <code>whitelist</code> chống mass-assignment.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ bài 21</div>
+    <p>Bài 21 bạn đã thấy Nest tự inject service qua constructor. Giờ thêm một khái niệm nữa: <strong>pipe</strong> — một bước xử lý dữ liệu <em>trước khi</em> nó tới controller. Nest có sẵn <code>ValidationPipe</code> dùng <code>class-validator</code> để kiểm tra body theo DTO bạn khai báo.</p>
+  </div>
+
+  <h2>1. Vì sao không tự if/else trong controller?</h2>
+
+  <p>Ở Express (bài 12–15) bạn tự viết <code>if (!title) return 400</code> trong handler. Với Nest, việc đó nên tách ra: controller chỉ nhận dữ liệu <em>đã hợp lệ</em>. Lý do:</p>
+  <ul class="checklist">
+    <li><strong>DRY:</strong> cùng một DTO dùng lại cho nhiều route (vd tạo + sửa khóa học).</li>
+    <li><strong>Đúng tầng:</strong> controller lo routing, pipe lo validation — mỗi thứ một việc.</li>
+    <li><strong>Chống mass-assignment:</strong> <code>whitelist</code> tự loại field lạ client gửi lên (vd <code>hack</code>).</li>
+  </ul>
+
+  <p>Theo <a href="https://docs.nestjs.com/pipes" target="_blank">tài liệu Pipes của NestJS</a>, pipe có hai việc: <em>transformation</em> (biến đổi dữ liệu) và <em>validation</em> (kiểm tra). <code>ValidationPipe</code> làm cả hai: chuyển body thành instance của DTO rồi validate bằng decorators.</p>
+
+  <h2>2. DTO — mô tả hình dạng body</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/create-course.dto.ts — DTO mới</span>
+<pre><code><span class="kw">import</span> { IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } <span class="kw">from</span> <span class="str">'class-validator'</span>
+
+<span class="cmt">// DTO: mô tả hình dạng body client gửi lên, kèm validator decorators</span>
+<span class="kw">export class</span> CreateCourseDto {
+  @<span class="fn">IsString</span>()
+  @<span class="fn">IsNotEmpty</span>()
+  <span class="cmt">// ! vì DTO được ValidationPipe gán giá trị, không cần khởi tạo constructor</span>
+  title!: string
+
+  @<span class="fn">IsOptional</span>() <span class="cmt">// cho phép bỏ qua field này</span>
+  @<span class="fn">IsNumber</span>()
+  @<span class="fn">Min</span>(<span class="num">0</span>)
+  @<span class="fn">Max</span>(<span class="num">100_000_000</span>)
+  price?: number
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao dùng class thay vì interface?</div>
+    <p>Interface chỉ tồn tại lúc compile — bị xóa khi build. <code>class-validator</code> cần <strong>decorators</strong> để biết rule, mà decorators chỉ hoạt động trên class. Vì vậy DTO phải là <code>class</code>, không phải <code>interface</code>.</p>
+  </div>
+
+  <h2>3. Bật ValidationPipe toàn cục</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/main.ts — thêm global pipe</span>
+<pre><code><span class="kw">import</span> <span class="str">'reflect-metadata'</span>
+<span class="kw">import</span> { ValidationPipe } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { NestFactory } <span class="kw">from</span> <span class="str">'@nestjs/core'</span>
+<span class="kw">import</span> { AppModule } <span class="kw">from</span> <span class="str">'./app.module.js'</span>
+
+<span class="kw">async function</span> <span class="fn">bootstrap</span>() {
+  <span class="kw">const</span> app = <span class="kw">await</span> NestFactory.<span class="fn">create</span>(AppModule)
+  <span class="cmt">// Global pipe: validate mọi body bằng class-validator trước khi tới controller</span>
+  app.<span class="fn">useGlobalPipes</span>(<span class="kw">new</span> ValidationPipe({ whitelist: <span class="kw">true</span> }))
+  <span class="kw">await</span> app.<span class="fn">listen</span>(<span class="num">3000</span>)
+  console.<span class="fn">log</span>(<span class="str">'NestJS: http://localhost:3000'</span>)
+}
+
+<span class="fn">bootstrap</span>().<span class="fn">catch</span>((error: unknown) => {
+  console.<span class="fn">error</span>(error)
+  process.exitCode = <span class="num">1</span>
+})</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ <code>whitelist: true</code> — chống mass-assignment</div>
+    <p>Khi bật, ValidationPipe <strong>tự loại bỏ mọi field không khai báo trong DTO</strong> trước khi tới controller. Nếu không bật, client có thể gửi field lạ (vd <code>hack</code>) và nó lọt vào body — nguy hiểm khi sau này bạn thêm field nhạy cảm (vd <code>isAdmin</code>).</p>
+  </div>
+
+  <h2>4. Controller dùng DTO</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/app.controller.ts — thêm POST /courses</span>
+<pre><code><span class="kw">import</span> { Body, Controller, Get, Post } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { CoursesService } <span class="kw">from</span> <span class="str">'./courses.service.js'</span>
+<span class="kw">import</span> { CreateCourseDto } <span class="kw">from</span> <span class="str">'./create-course.dto.js'</span>
+
+@<span class="fn">Controller</span>()
+<span class="kw">export class</span> AppController {
+  <span class="kw">constructor</span>(<span class="kw">private readonly</span> coursesService: CoursesService) {}
+
+  @<span class="fn">Get</span>()
+  <span class="fn">getRoot</span>(): { message: string } {
+    <span class="kw">return</span> { message: <span class="str">'E-Learning NestJS đã chạy'</span> }
+  }
+
+  @<span class="fn">Get</span>(<span class="str">'courses'</span>)
+  <span class="fn">getCourses</span>() {
+    <span class="kw">return</span> <span class="kw">this</span>.coursesService.findAll()
+  }
+
+  <span class="cmt">// Body được ValidationPipe tự chuyển thành instance CreateCourseDto và validate</span>
+  @<span class="fn">Post</span>(<span class="str">'courses'</span>)
+  <span class="fn">createCourse</span>(@<span class="fn">Body</span>() dto: CreateCourseDto) {
+    <span class="kw">return</span> dto <span class="cmt">// tạm trả lại để thấy dữ liệu đã được validate + whitelist</span>
+  }
+}</code></pre>
+  </div>
+
+  <h2>5. Thử thách triển khai</h2>
+
+  <div class="try-it">
+    <h3>Đề bài</h3>
+    <p>Từ code bài 21, thêm DTO + ValidationPipe để <code>POST /courses</code> tự validate body.</p>
+
+    <ul class="checklist">
+      <li><strong>TC1:</strong> Tạo <code>src/nest/create-course.dto.ts</code> với <code>title</code> bắt buộc (string, không rỗng) và <code>price</code> tùy chọn (number, 0–100.000.000).</li>
+      <li><strong>TC2:</strong> <code>main.ts</code> bật <code>app.useGlobalPipes(new ValidationPipe({ whitelist: true }))</code>.</li>
+      <li><strong>TC3:</strong> <code>AppController</code> thêm <code>POST /courses</code> nhận <code>@Body() dto: CreateCourseDto</code>.</li>
+      <li><strong>TC4:</strong> POST hợp lệ → trả DTO; thiếu title → 400; price âm → 400; field lạ → bị loại.</li>
+    </ul>
+
+    <p><strong>Definition of Done:</strong> 4 case curl đúng như mô tả; bạn tự giải thích vì sao DTO phải là class chứ không phải interface.</p>
+  </div>
+
+  <h3>Hint ladder — chỉ mở khi kẹt thật</h3>
+
+  <details>
+    <summary>Hint 1 · Package đã cài sẵn</summary>
+    <p><code>class-validator@0.15.1</code> và <code>class-transformer@0.5.1</code> đã có trong <code>package.json</code>. Nếu clone máy sạch, chạy <code>npm install</code> là đủ.</p>
+  </details>
+
+  <details>
+    <summary>Hint 2 · Lỗi strict "no initializer"</summary>
+    <p>Khi khai <code>title: string</code> mà không gán, TS strict báo lỗi. Thêm <code>!</code> (definite assignment assertion): <code>title!: string</code> — vì ValidationPipe sẽ gán giá trị, không cần khởi tạo constructor.</p>
+  </details>
+
+  <h2>6. Checkpoint — bạn hiểu hay chỉ copy?</h2>
+
+  <div class="quiz">
+    <h3>🧠 Câu 1</h3>
+    <div class="q">Vì sao DTO phải là <code>class</code> chứ không phải <code>interface</code>?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — interface bị xóa lúc build, không giữ decorators.">A. Vì interface không hỗ trợ type annotation</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — class-validator cần decorators để biết rule, mà decorators chỉ hoạt động trên class; interface bị xóa khi build.">B. Vì class-validator cần decorators, mà decorators chỉ hoạt động trên class</button>
+    <button class="opt" data-correct="false" data-explain="Sai — Nest không bắt buộc class vì lý do performance.">C. Vì class chạy nhanh hơn interface</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Câu 2</h3>
+    <div class="q"><code>whitelist: true</code> làm gì?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — whitelist không liên quan tới CORS.">A. Chặn request từ domain lạ</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — tự loại field không khai báo trong DTO, chống mass-assignment.">B. Tự loại bỏ field không khai báo trong DTO</button>
+    <button class="opt" data-correct="false" data-explain="Sai — whitelist không đổi status code mặc định.">C. Đổi status code mặc định thành 201</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🎤 Góc phỏng vấn — "ValidationPipe để làm gì?"</div>
+    <p>Trả lời gọn: pipe là bước xử lý dữ liệu trước khi tới controller. <code>ValidationPipe</code> dùng <code>class-validator</code> để validate body theo DTO (class có decorators), đồng thời <code>whitelist</code> loại field lạ chống mass-assignment. Nhờ đó controller chỉ nhận dữ liệu đã hợp lệ, không tự if/else.</p>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu bài sau)</h2>
+  <p>Hiện <code>POST /courses</code> chỉ trả lại DTO, chưa lưu vào đâu. Bài sau ta nối TypeORM + PostgreSQL: service sẽ nhận DTO đã validate và ghi vào bảng <code>courses</code>. Bạn nghĩ method <code>create()</code> trong service nên nhận tham số gì — DTO hay object thường?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 23 · TypeORM + PostgreSQL trong NestJS — entities, migrations</div>
+    <p class="nd">Nối database thật: entity, repository, và lưu khóa học vào PostgreSQL qua TypeORM.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0021-controller-service-provider-dependency-injection.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm xong cho tôi thấy code 3 file + output 4 case curl thật. Có chỗ nào chưa hiểu về pipe/DTO, cứ hỏi ngay.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
