@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common'
+import { Body, Controller, Get, Post } from '@nestjs/common'
 import { CoursesService } from './courses.service.js'
+import { CreateCourseDto } from './create-course.dto.js'
 
 @Controller()
 export class AppController {
@@ -14,5 +15,10 @@ export class AppController {
   @Get('courses')
   getCourses() {
     return this.coursesService.findAll()
+  }
+
+  @Post('courses')
+  createCourse(@Body() dto: CreateCourseDto) {
+    return dto // tạm trả lại để thấy dữ liệu đã được validate + whitelist
   }
 }
