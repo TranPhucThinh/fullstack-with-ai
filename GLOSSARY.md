@@ -128,3 +128,9 @@ Thuật ngữ được thêm vào khi người học đã dùng ĐÚNG (rule A23
 | **emitDecoratorMetadata** | Flag tsconfig bắt TypeScript phát ra `design:paramtypes` (kiểu các constructor param) — Nest đọc để biết cần inject gì; thiếu flag → service `undefined` → 500 | 21 |
 | **design:paramtypes** | Metadata do tsc sinh ra khi bật `emitDecoratorMetadata`: mảng các kiểu mà constructor nhận — chính là thứ Nest đọc để inject dependency | 21 |
 | **constructor injection** | Kiểu DI bằng cách khai dependency trong `constructor(private readonly x: Type)` — Nest tự đưa instance đúng vào, không gọi `new` | 21 |
+| **DTO (Data Transfer Object)** | Class mô tả hình dạng dữ liệu truyền giữa client và controller, kèm validator decorators — phải là class (giữ metadata) chứ không phải interface | 22 |
+| **ValidationPipe** | Pipe chuẩn của Nest dùng class-validator: transform body thành DTO instance rồi validate theo decorators; đặt global thì áp dụng mọi request | 22 |
+| **class-validator** | Thư viện validate dữ liệu qua decorators (`@IsString()`, `@IsNotEmpty()`, `@Min()`...) gắn lên field của DTO class | 22 |
+| **whitelist** | Option của ValidationPipe tự loại bỏ field không khai báo trong DTO trước khi tới controller — chống mass-assignment | 22 |
+| **mass-assignment** | Tấn công gán field nhạy cảm (vd `roleAdmin`) bằng cách gửi kèm trong body; `whitelist: true` loại bỏ chúng | 22 |
+| **pipe** | Bước xử lý dữ liệu giữa client và controller: transformation (biến đổi) + validation (kiểm tra) — giúp tách xác thực khỏi code nghiệp vụ | 22 |

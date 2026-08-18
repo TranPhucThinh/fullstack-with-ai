@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài 23 · TypeORM + PostgreSQL trong NestJS — entities, repository</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+<div class="wrap">
+
+  <span class="lesson-tag">Module 4 · Bài 23</span>
+  <h1>TypeORM + PostgreSQL — entity ánh xạ bảng, repository thay SQL tay</h1>
+  <p class="subtitle">Bài 22 `POST /courses` chỉ trả lại DTO. Giờ nối database thật: entity `CourseEntity` ánh xạ bảng `courses`, service dùng Repository để lưu/đọc — không viết SQL tay như bài 12.</p>
+  <p class="meta-line">⏱ ~45 phút · 🎯 Mục tiêu: giải thích được entity ↔ bảng, repository ↔ SQL, và vì sao `synchronize` chỉ dùng dev.</p>
+
+  <div class="callout bridge">
+    <div class="ct">🌉 Bắc cầu từ bài 12 (pg) và bài 22 (DTO)</div>
+    <p>Bài 12 bạn viết SQL tay qua `pg.Pool`. Bài 22 bạn có DTO đã validate. Giờ TypeORM nối hai thứ: <strong>entity</strong> (class ánh xạ bảng) + <strong>repository</strong> (đối tượng thay cho câu SQL). Nest inject repository vào service qua DI — đúng tinh thần bài 21.</p>
+  </div>
+
+  <h2>1. Entity — class ánh xạ bảng</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/course.entity.ts — entity mới</span>
+<pre><code><span class="kw">import</span> { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } <span class="kw">from</span> <span class="str">'typeorm'</span>
+
+<span class="cmt">// Entity: ánh xạ class -> bảng 'courses' trong PostgreSQL</span>
+@<span class="fn">Entity</span>(<span class="str">'courses'</span>)
+<span class="kw">export class</span> CourseEntity {
+  @<span class="fn">PrimaryGeneratedColumn</span>() <span class="cmt">// id tự tăng (SERIAL)</span>
+  id!: number
+
+  @<span class="fn">Column</span>({ type: <span class="str">'varchar'</span>, length: <span class="num">255</span> })
+  title!: string
+
+  @<span class="fn">Column</span>({ type: <span class="str">'integer'</span>, default: <span class="num">0</span> })
+  price!: number
+
+  @<span class="fn">CreateDateColumn</span>() <span class="cmt">// tự gán thời điểm tạo</span>
+  createdAt!: Date
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Entity khác DTO thế nào?</div>
+    <p><strong>DTO</strong> mô tả dữ liệu <em>vào</em> (body client gửi). <strong>Entity</strong> mô tả dữ liệu <em>lưu</em> (bảng DB). DTO có thể thiếu `id`/`createdAt`; entity có đủ. Đừng nhầm hai thứ — đây là lỗi phổ biến của junior.</p>
+  </div>
+
+  <h2>2. Kết nối TypeORM trong module</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/app.module.ts — thêm TypeOrmModule</span>
+<pre><code><span class="kw">import</span> { Module } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { TypeOrmModule } <span class="kw">from</span> <span class="str">'@nestjs/typeorm'</span>
+<span class="kw">import</span> { AppController } <span class="kw">from</span> <span class="str">'./app.controller.js'</span>
+<span class="kw">import</span> { CoursesService } <span class="kw">from</span> <span class="str">'./courses.service.js'</span>
+<span class="kw">import</span> { CourseEntity } <span class="kw">from</span> <span class="str">'./course.entity.js'</span>
+
+@<span class="fn">Module</span>({
+  imports: [
+    <span class="cmt">// Kết nối PostgreSQL + đăng ký entity CourseEntity</span>
+    TypeOrmModule.<span class="fn">forRoot</span>({
+      type: <span class="str">'postgres'</span>,
+      host: <span class="str">'localhost'</span>,
+      port: <span class="num">5432</span>,
+      username: <span class="str">'elearning'</span>,
+      password: <span class="str">'elearning_dev_password'</span>,
+      database: <span class="str">'elearning'</span>,
+      entities: [CourseEntity],
+      synchronize: <span class="kw">true</span>, <span class="cmt">// tự tạo bảng khi dev — production dùng migration (bài sau)</span>
+    }),
+    <span class="cmt">// Đăng ký Repository<CourseEntity> cho DI</span>
+    TypeOrmModule.<span class="fn">forFeature</span>([CourseEntity]),
+  ],
+  controllers: [AppController],
+  providers: [CoursesService],
+})
+<span class="kw">export class</span> AppModule {}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ct">⚠️ `synchronize: true` chỉ dành cho dev</div>
+    <p>`synchronize` tự tạo/sửa bảng theo entity mỗi lần khởi động — tiện khi dev nhưng <strong>nguy hiểm ở production</strong> (có thể xóa cột, mất data). Production phải dùng <strong>migration</strong> (bài sau). Đây là điểm hay bị hỏi phỏng vấn.</p>
+  </div>
+
+  <h2>3. Service dùng Repository</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/courses.service.ts — thay mảng hằng bằng DB</span>
+<pre><code><span class="kw">import</span> { Injectable } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { InjectRepository } <span class="kw">from</span> <span class="str">'@nestjs/typeorm'</span>
+<span class="kw">import</span> { Repository } <span class="kw">from</span> <span class="str">'typeorm'</span>
+<span class="kw">import</span> { CourseEntity } <span class="kw">from</span> <span class="str">'./course.entity.js'</span>
+<span class="kw">import</span> { CreateCourseDto } <span class="kw">from</span> <span class="str">'./create-course.dto.js'</span>
+
+@<span class="fn">Injectable</span>()
+<span class="kw">export class</span> CoursesService {
+  <span class="cmt">// Inject Repository — TypeORM tự cung cấp cho entity CourseEntity</span>
+  <span class="kw">constructor</span>(
+    @<span class="fn">InjectRepository</span>(CourseEntity)
+    <span class="kw">private readonly</span> repo: Repository<CourseEntity>,
+  ) {}
+
+  <span class="fn">findAll</span>(): Promise<CourseEntity[]> {
+    <span class="kw">return</span> <span class="kw">this</span>.repo.find() <span class="cmt">// SELECT * FROM courses</span>
+  }
+
+  <span class="fn">create</span>(dto: CreateCourseDto): Promise<CourseEntity> {
+    <span class="cmt">// repo.create() tạo instance entity (không lưu); repo.save() INSERT hoặc UPDATE</span>
+    <span class="kw">const</span> entity = <span class="kw">this</span>.repo.create(dto)
+    <span class="kw">return</span> <span class="kw">this</span>.repo.save(entity)
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">💡 Vì sao `repo.create(dto)` rồi mới `save()`?</div>
+    <p>`repo.create()` tạo instance entity từ plain object (DTO) — TypeORM biết field nào thuộc entity. `repo.save()` mới thực sự INSERT. Tách hai bước giúp bạn kiểm tra/đổi entity trước khi lưu. Có thể gọi `repo.save(dto)` trực tiếp nhưng mất kiểm soát.</p>
+  </div>
+
+  <h2>4. Controller — không đổi nhiều</h2>
+
+  <div class="code-block">
+    <span class="code-label">src/nest/app.controller.ts — service giờ trả Promise</span>
+<pre><code><span class="kw">import</span> { Body, Controller, Get, Post } <span class="kw">from</span> <span class="str">'@nestjs/common'</span>
+<span class="kw">import</span> { CreateCourseDto } <span class="kw">from</span> <span class="str">'./create-course.dto.js'</span>
+<span class="kw">import</span> { CoursesService } <span class="kw">from</span> <span class="str">'./courses.service.js'</span>
+
+@<span class="fn">Controller</span>()
+<span class="kw">export class</span> AppController {
+  <span class="kw">constructor</span>(<span class="kw">private readonly</span> coursesService: CoursesService) {}
+
+  @<span class="fn">Get</span>()
+  <span class="fn">getRoot</span>(): { message: string } {
+    <span class="kw">return</span> { message: <span class="str">'E-Learning NestJS đã chạy'</span> }
+  }
+
+  @<span class="fn">Get</span>(<span class="str">'courses'</span>)
+  <span class="fn">findAll</span>() {
+    <span class="kw">return</span> <span class="kw">this</span>.coursesService.findAll() <span class="cmt">// Promise — Nest tự await và trả JSON</span>
+  }
+
+  <span class="cmt">// Body được ValidationPipe validate -> DTO đã hợp lệ -> service lưu vào DB</span>
+  @<span class="fn">Post</span>(<span class="str">'courses'</span>)
+  <span class="fn">create</span>(@<span class="fn">Body</span>() dto: CreateCourseDto) {
+    <span class="kw">return</span> <span class="kw">this</span>.coursesService.create(dto)
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ct">💡 Nest tự await Promise</div>
+    <p>Controller trả về `Promise` — Nest tự `await` và serialize thành JSON. Bạn không cần `async/await` trong controller nếu service đã trả Promise. Đây là điểm khác Express (phải tự `await` trong handler).</p>
+  </div>
+
+  <h2>5. Thử thách triển khai</h2>
+
+  <div class="try-it">
+    <h3>Đề bài</h3>
+    <p>Từ code bài 22, nối TypeORM + PostgreSQL để `POST /courses` thực sự lưu vào bảng `courses`.</p>
+
+    <ul class="checklist">
+      <li><strong>TC1:</strong> Tạo `src/nest/course.entity.ts` với `@Entity('courses')`, `id` (PrimaryGeneratedColumn), `title` (varchar 255), `price` (integer default 0), `createdAt` (CreateDateColumn).</li>
+      <li><strong>TC2:</strong> `app.module.ts` thêm `TypeOrmModule.forRoot({...})` kết nối PostgreSQL (user `elearning`, db `elearning`) + `TypeOrmModule.forFeature([CourseEntity])`.</li>
+      <li><strong>TC3:</strong> `courses.service.ts` inject `Repository<CourseEntity>` qua `@InjectRepository`, `findAll()` dùng `repo.find()`, `create(dto)` dùng `repo.create()` + `repo.save()`.</li>
+      <li><strong>TC4:</strong> `app.controller.ts` gọi service (trả Promise).</li>
+      <li><strong>TC5:</strong> POST tạo khóa → trả entity có `id` + `createdAt`; GET trả danh sách từ DB (không phải mảng hằng).</li>
+    </ul>
+
+    <p><strong>Definition of Done:</strong> POST 2 khóa → GET trả 2 khóa có `id` + `createdAt`; bạn tự giải thích vì sao `synchronize` không dùng ở production.</p>
+  </div>
+
+  <h3>Hint ladder — chỉ mở khi kẹt thật</h3>
+
+  <details>
+    <summary>Hint 1 · Package đã cài sẵn</summary>
+    <p>`typeorm@1.1.0` và `@nestjs/typeorm@11.0.3` đã có trong `package.json`. PostgreSQL đang chạy qua docker (user `elearning`, password `elearning_dev_password`, db `elearning`).</p>
+  </details>
+
+  <details>
+    <summary>Hint 2 · Lỗi "no metadata for CourseEntity"</summary>
+    <p>Quên đăng ký entity trong `entities: [CourseEntity]` của `forRoot` hoặc quên `forFeature([CourseEntity])`. Cả hai đều cần.</p>
+  </details>
+
+  <h2>6. Checkpoint — bạn hiểu hay chỉ copy?</h2>
+
+  <div class="quiz">
+    <h3>🧠 Câu 1</h3>
+    <div class="q">Entity khác DTO ở điểm nào?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — cả hai đều là class, nhưng mục đích khác nhau.">A. Entity là interface, DTO là class</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — DTO mô tả dữ liệu vào (body), entity mô tả dữ liệu lưu (bảng DB, có id/createdAt).">B. DTO mô tả dữ liệu vào, entity mô tả dữ liệu lưu trong bảng</button>
+    <button class="opt" data-correct="false" data-explain="Sai — entity có thể có field không nằm trong DTO (vd createdAt).">C. Chúng giống hệt nhau, chỉ khác tên</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="quiz">
+    <h3>🧠 Câu 2</h3>
+    <div class="q">Vì sao `synchronize: true` không dùng ở production?</div>
+    <button class="opt" data-correct="false" data-explain="Sai — synchronize không liên quan tới tốc độ.">A. Vì nó chạy chậm</button>
+    <button class="opt" data-correct="true" data-explain="Đúng — tự sửa bảng theo entity có thể xóa cột/mất data; production phải dùng migration có kiểm soát.">B. Vì tự sửa bảng có thể xóa cột/mất data; cần migration có kiểm soát</button>
+    <button class="opt" data-correct="false" data-explain="Sai — synchronize không liên quan tới bảo mật auth.">C. Vì nó bỏ qua authentication</button>
+    <div class="feedback"></div>
+  </div>
+
+  <div class="callout why">
+    <div class="ct">🎤 Góc phỏng vấn — "TypeORM là gì?"</div>
+    <p>Trả lời gọn: TypeORM là ORM (Object-Relational Mapping) — ánh xạ class (entity) sang bảng, method (repository) sang SQL. Nest tích hợp qua `TypeOrmModule.forRoot()` (kết nối) + `forFeature()` (đăng ký repository cho DI). Ưu điểm: không viết SQL tay, type-safe, quản lý migration.</p>
+  </div>
+
+  <h2>7. Câu hỏi tư duy (bắc cầu bài sau)</h2>
+  <p>Hiện `synchronize: true` tự tạo bảng. Khi dự án lớn, thay đổi entity (vd thêm cột `description`) cần migration để áp dụng an toàn. Bài sau ta học migration — bạn nghĩ migration khác `synchronize` ở điểm gì về kiểm soát?</p>
+
+  <div class="next-box">
+    <div class="nl">→ Bài tiếp theo</div>
+    <div class="nt">Bài 24 · Chuyển dự án Express → NestJS (bài tổng hợp lớn)</div>
+    <p class="nd">Gom toàn bộ nghiệp vụ e-learning (users, auth, courses, enrollments) từ Express sang NestJS.</p>
+  </div>
+
+  <div class="navbar">
+    <a href="0022-dto-validation-pipe-class-validator.html">← Trước</a>
+    <a href="index.html">🏠 Mục lục</a>
+    <a href="#" class="disabled">Sau →</a>
+  </div>
+
+  <p class="try-it">💬 <strong>Tôi là người dạy của bạn.</strong> Làm xong cho tôi thấy code 4 file + output curl thật (POST 2 khóa + GET). Có chỗ nào chưa hiểu về entity/repository, cứ hỏi ngay.</p>
+
+</div>
+<script src="lesson-enhance.js"></script>
+</body>
+</html>
